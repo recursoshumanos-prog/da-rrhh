@@ -566,19 +566,16 @@ function startAutoSync(){
     }).then(function(r){ return r.json(); })
     .then(function(data){
       if(!data||!data[0]||!data[0].contenido||data[0].contenido==='{}') return;
+      // Simply replace local state with remote - remote is always authoritative
       var remote=JSON.parse(data[0].contenido);
-      var before=JSON.stringify(ST);
-      mergeRemote(remote);
-      var after=JSON.stringify(ST);
-      if(before!==after){
-        try{ localStorage.setItem(LSK,JSON.stringify(ST)); }catch(x){}
-        setSyncStatus('ok','Actualizado ↻');
-        setTimeout(function(){ setSyncStatus('ok','Sincronizado'); },2500);
-        if(cDni){ var e=getEmp(cDni); if(e) renderDetail(e); }
-        renderList(); updStats(); buildAlerts();
-      }
+      ST = remote;
+      try{ localStorage.setItem(LSK,JSON.stringify(ST)); }catch(x){}
+      setSyncStatus('ok','Sincronizado ↻');
+      setTimeout(function(){ setSyncStatus('ok','Sincronizado'); },2000);
+      if(cDni){ var e=getEmp(cDni); if(e) renderDetail(e); }
+      renderList(); updStats(); buildAlerts();
     }).catch(function(){});
-  }, 20000);
+  }, 15000);
 }
 function showSaved(msg){ var el=document.getElementById('SLBL'); el.innerHTML=msg; setTimeout(function(){el.innerHTML='';},2500); }
 function ges(d){ if(!ST[d]) ST[d]={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''}; return ST[d]; }
