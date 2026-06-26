@@ -621,7 +621,13 @@ function mF(e){
 }
 function getEstado(e){
   var es2=ges(e.dni);
-  return (es2.edits&&es2.edits.estado)||e.estado||'ACTIVO';
+  // If estado was explicitly edited, use that
+  if(es2.edits&&es2.edits.estado) return es2.edits.estado;
+  // If baja date is set (edited or original), mark as BAJA
+  var baja = (es2.edits&&es2.edits.baja)||e.baja||'';
+  if(baja&&baja!=='-'&&baja.length>4) return 'BAJA';
+  // Otherwise use original estado
+  return e.estado||'ACTIVO';
 }
 function badgeCls(est){
   var m={ACTIVO:'b-act',BAJA:'b-baj',IT:'b-it',EXCEDENCIA:'b-exc','MATERNIDAD/PATERNIDAD':'b-mat',SUSPENSION:'b-exc'};
