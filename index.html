@@ -4,7 +4,6 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Portal RRHH - Distrito de Abogados</title>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --r:#C8102E;--r2:#a00d24;--d:#f6f8fa;--m:#ffffff;--m2:#f0f3f6;
@@ -452,123 +451,125 @@ window.onload = function() {
   mergePreloaded();
 };
 
-async function doLogin(){
+function doLogin(){
   if(document.getElementById('PI').value===PW){
     document.getElementById('LS').style.display='none';
     document.getElementById('APP').style.display='flex';
-    // Init Supabase
-    try{
-      _sb = window.supabase.createClient(SB_URL, SB_KEY);
-      await loadFromSupabase();
-    }catch(e){
-      console.error('Supabase init error:',e);
-      setSyncStatus('err','Sin conexion');
-    }
-    mergePreloaded();
-    renderList(); updStats(); buildAlerts();
-    startAutoSync();
+    loadFromSupabase(function(){
+      mergePreloaded();
+      renderList(); updStats(); buildAlerts();
+      startAutoSync();
+    });
   } else { document.getElementById('LE').style.display='block'; }
 }
 
+function sbHeaders(){
+  return {
+    'apikey': SB_KEY,
+    'Authorization': 'Bearer ' + SB_KEY,
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal'
+  };
+}
+
 function saveAll(){
-  // Always save locally first
-  try{ localStorage.setItem(LSK,JSON.stringify(ST)); }catch(x){}
-  // Then sync to Supabase
-  syncToSupabase();
-}
-
-async function syncToSupabase(){
-  if(!_sb) return;
+  try{ localStorage.setItem(LSK, JSON.stringify(ST)); }catch(x){}
   setSyncStatus('loading','Guardando...');
-  try{
-    var res = await _sb.from(SB_TABLE).upsert({id:1, contenido:JSON.stringify(ST), updated_at: new Date().toISOString()});
-    if(res.error) throw res.error;
-    setSyncStatus('ok','Guardado');
-    setTimeout(function(){ document.getElementById('SLBL').textContent=''; },2000);
-  }catch(e){
-    setSyncStatus('err','Error al guardar');
-    console.error('Supabase save error:',e);
-  }
+  var body = JSON.stringify({id:1, contenido: JSON.stringify(ST)});
+  fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.1', {
+    method: 'PATCH',
+    headers: sbHeaders(),
+    body: body
+  }).then(function(r){
+    if(r.ok){
+      setSyncStatus('ok','Guardado ✓');
+      setTimeout(function(){ setSyncStatus('ok',''); },2000);
+    } else {
+      // Try INSERT if PATCH returned 0 rows
+      fetch(SB_URL+'/rest/v1/'+SB_TABLE, {
+        method: 'POST',
+        headers: Object.assign({},sbHeaders(),{'Prefer':'return=minimal'}),
+        body: body
+      }).then(function(r2){
+        if(r2.ok){ setSyncStatus('ok','Guardado ✓'); }
+        else { setSyncStatus('err','Error al guardar'); }
+      });
+    }
+  }).catch(function(){
+    setSyncStatus('err','Sin conexion');
+  });
 }
 
-async function loadFromSupabase(){
-  if(!_sb) return false;
+function loadFromSupabase(cb){
   setSyncStatus('loading','Cargando...');
-  try{
-    var res = await _sb.from(SB_TABLE).select('contenido').eq('id',1).single();
-    if(res.error) throw res.error;
-    if(res.data && res.data.contenido && res.data.contenido !== '{}'){
-      var remote = JSON.parse(res.data.contenido);
-      // Merge: remote wins for records, local edits preserved if newer
-      for(var dni in remote){
-        if(!ST[dni]){ ST[dni]=remote[dni]; }
-        else{
-          // Merge records - combine and deduplicate by id
-          var localRecs = ST[dni].records || [];
-          var remoteRecs = remote[dni].records || [];
-          var allIds = {};
-          remoteRecs.forEach(function(r){ allIds[r.id]=r; });
-          localRecs.forEach(function(r){ if(!allIds[r.id]) allIds[r.id]=r; });
-          ST[dni].records = Object.values(allIds);
-          // Remote wins for other fields if they have data
-          if(remote[dni].notas && remote[dni].notas.length > (ST[dni].notas||[]).length)
-            ST[dni].notas = remote[dni].notas;
-          if(remote[dni].disciplinario && remote[dni].disciplinario.length > (ST[dni].disciplinario||[]).length)
-            ST[dni].disciplinario = remote[dni].disciplinario;
-          if(remote[dni].historial && remote[dni].historial.length > (ST[dni].historial||[]).length)
-            ST[dni].historial = remote[dni].historial;
-          if(remote[dni].edits && Object.keys(remote[dni].edits).length > 0)
-            ST[dni].edits = Object.assign({}, remote[dni].edits, ST[dni].edits);
-        }
-      }
-      try{ localStorage.setItem(LSK,JSON.stringify(ST)); }catch(x){}
+  fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.1&select=contenido', {
+    method: 'GET',
+    headers: {
+      'apikey': SB_KEY,
+      'Authorization': 'Bearer ' + SB_KEY
+    }
+  }).then(function(r){ return r.json(); })
+  .then(function(data){
+    if(data && data[0] && data[0].contenido && data[0].contenido !== '{}'){
+      var remote = JSON.parse(data[0].contenido);
+      mergeRemote(remote);
+      try{ localStorage.setItem(LSK, JSON.stringify(ST)); }catch(x){}
     }
     setSyncStatus('ok','Sincronizado');
-    return true;
-  }catch(e){
+    if(cb) cb();
+  }).catch(function(e){
+    console.error('Load error:',e);
     setSyncStatus('err','Sin conexion (local)');
-    console.error('Supabase load error:',e);
-    return false;
+    if(cb) cb();
+  });
+}
+
+function mergeRemote(remote){
+  for(var dni in remote){
+    if(!ST[dni]){ ST[dni]=remote[dni]; continue; }
+    // Merge records by id
+    var byId={};
+    (ST[dni].records||[]).forEach(function(r){ byId[r.id]=r; });
+    (remote[dni].records||[]).forEach(function(r){ if(!byId[r.id]) byId[r.id]=r; });
+    ST[dni].records = Object.values(byId);
+    // Remote wins for notas, disc, historial if longer
+    if((remote[dni].notas||[]).length > (ST[dni].notas||[]).length) ST[dni].notas=remote[dni].notas;
+    if((remote[dni].disciplinario||[]).length > (ST[dni].disciplinario||[]).length) ST[dni].disciplinario=remote[dni].disciplinario;
+    if((remote[dni].historial||[]).length > (ST[dni].historial||[]).length) ST[dni].historial=remote[dni].historial;
+    // Merge edits - both wins
+    if(remote[dni].edits) ST[dni].edits = Object.assign({}, remote[dni].edits, ST[dni].edits||{});
+    if(remote[dni].cuenta && !ST[dni].cuenta) ST[dni].cuenta=remote[dni].cuenta;
   }
 }
 
 function setSyncStatus(type,msg){
   var dot=document.getElementById('SDOT');
   var lbl=document.getElementById('SLBL');
-  if(dot){ dot.className='sync-dot '+type; }
-  if(lbl){ lbl.textContent=msg; }
+  if(dot) dot.className='sync-dot '+type;
+  if(lbl) lbl.innerHTML=msg||'';
 }
 
 function startAutoSync(){
-  // Poll every 30 seconds for changes from the other user
-  _syncInterval = setInterval(async function(){
-    if(!_sb) return;
-    try{
-      var res = await _sb.from(SB_TABLE).select('contenido,updated_at').eq('id',1).single();
-      if(res.error || !res.data) return;
-      var remote = JSON.parse(res.data.contenido||'{}');
-      var changed = false;
-      for(var dni in remote){
-        if(!ST[dni]){ ST[dni]=remote[dni]; changed=true; }
-        else{
-          var localIds = (ST[dni].records||[]).map(function(r){return r.id;});
-          (remote[dni].records||[]).forEach(function(r){
-            if(localIds.indexOf(r.id)<0){ (ST[dni].records=ST[dni].records||[]).push(r); changed=true; }
-          });
-          if((remote[dni].notas||[]).length>(ST[dni].notas||[]).length){ ST[dni].notas=remote[dni].notas; changed=true; }
-          if((remote[dni].disciplinario||[]).length>(ST[dni].disciplinario||[]).length){ ST[dni].disciplinario=remote[dni].disciplinario; changed=true; }
-          if((remote[dni].historial||[]).length>(ST[dni].historial||[]).length){ ST[dni].historial=remote[dni].historial; changed=true; }
-        }
-      }
-      if(changed){
+  _syncInterval = setInterval(function(){
+    fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.1&select=contenido', {
+      method:'GET',
+      headers:{'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY}
+    }).then(function(r){ return r.json(); })
+    .then(function(data){
+      if(!data||!data[0]||!data[0].contenido||data[0].contenido==='{}') return;
+      var remote=JSON.parse(data[0].contenido);
+      var before=JSON.stringify(ST);
+      mergeRemote(remote);
+      var after=JSON.stringify(ST);
+      if(before!==after){
         try{ localStorage.setItem(LSK,JSON.stringify(ST)); }catch(x){}
-        setSyncStatus('ok','Actualizado &#8635;');
-        setTimeout(function(){setSyncStatus('ok','Sincronizado');},2000);
-        // Refresh current employee view if open
+        setSyncStatus('ok','Actualizado ↻');
+        setTimeout(function(){ setSyncStatus('ok','Sincronizado'); },2500);
         if(cDni){ var e=getEmp(cDni); if(e) renderDetail(e); }
+        renderList(); updStats(); buildAlerts();
       }
-    }catch(ex){}
-  }, 30000);
+    }).catch(function(){});
+  }, 20000);
 }
 function showSaved(msg){ var el=document.getElementById('SLBL'); el.innerHTML=msg; setTimeout(function(){el.innerHTML='';},2500); }
 function ges(d){ if(!ST[d]) ST[d]={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''}; return ST[d]; }
