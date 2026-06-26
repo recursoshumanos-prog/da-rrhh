@@ -2,6 +2,9 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Portal RRHH - Distrito de Abogados</title>
 <style>
@@ -414,6 +417,7 @@ var SOCS = ["ASCENT LEGAL STRATEGIES SOCIEDAD LIM", "ASESORIA BOWIE, S.L", "ASES
 var DESPS = ["CARABANCHEL", "DOCTOR ESQUERDO", "MU 108", "MU 119", "MU 126", "MU 35", "MU 53", "MU 64", "MU 65", "OPORTO", "ROTA", "VALLECAS 108", "VALLECAS 76"];
 var ESTADOS_LIST = ["ACTIVO", "BAJA", "IT", "EXCEDENCIA", "MATERNIDAD/PATERNIDAD", "SUSPENSION"];
 var PW = 'Distrito2026';
+var VERSION = '1782487675';
 var SB_URL = 'https://yykvtpdhgrvvvevnteth.supabase.co';
 var SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl5a3Z0cGRoZ3J2dnZldm50ZXRoIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4MTE4MDkzMSwiZXhwIjoyMDk2NzU2OTMxfQ.U4hE7BLC4-GQZs8Xbdoop5kFOmXgWEEIIyoxsN9xC7I';
 var SB_TABLE = 'rrhh_portal';
@@ -558,7 +562,20 @@ function setSyncStatus(type,msg){
   if(lbl) lbl.innerHTML=msg||'';
 }
 
+function checkVersion(){
+  fetch(window.location.href+'?v='+Date.now(), {cache:'no-store'})
+  .then(function(r){return r.text();})
+  .then(function(txt){
+    var m=txt.match(/var VERSION = '([^']+)'/);
+    if(m && m[1] && m[1]!==VERSION){
+      console.log('Nueva version detectada, recargando...');
+      window.location.reload(true);
+    }
+  }).catch(function(){});
+}
+
 function startAutoSync(){
+  setInterval(checkVersion, 120000);
   _syncInterval = setInterval(function(){
     fetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.1&select=contenido', {
       method:'GET',
