@@ -638,12 +638,12 @@ function mF(e){
 }
 function getEstado(e){
   var es2=ges(e.dni);
-  // If estado was explicitly edited, use that
   if(es2.edits&&es2.edits.estado) return es2.edits.estado;
-  // Check baja date - edited value takes priority (including empty = no baja)
   var bajaEdited = es2.edits&&es2.edits.hasOwnProperty('baja');
   var baja = bajaEdited ? es2.edits.baja : (e.baja||'');
-  if(baja&&baja!=='-'&&baja.length>4) return 'BAJA';
+  // ANULADA means baja was cancelled
+  if(!baja||baja==='-'||baja==='ANULADA'||baja==='') return e.estado||'ACTIVO';
+  if(baja.length>4) return 'BAJA';
   return e.estado||'ACTIVO';
 }
 function badgeCls(est){
