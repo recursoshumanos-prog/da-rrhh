@@ -1155,8 +1155,14 @@ function openEditField(emp,es2,label,field,currentVal,type,opts){
     fg.appendChild(sel);
   } else if(type==='date'){
     var inp=document.createElement('input'); inp.type='date'; inp.id='EC-INPUT';
-    // Try to parse current val (dd/mm/yyyy or yyyy-mm-dd)
-    var raw=editField.emp[editField.field]||''; if(raw&&raw.length>=8) inp.value=raw.substring(0,10); else inp.value='';
+    // Get raw value from edits or base emp
+    var es2c=editField.es2;
+    var raw=(es2c.edits&&es2c.edits[editField.field]!==undefined)?es2c.edits[editField.field]:(editField.emp[editField.field]||'');
+    // Convert dd/mm/yyyy to yyyy-mm-dd if needed
+    if(raw&&raw.indexOf('/')>0){var pp=raw.split('/');raw=pp[2]+'-'+pp[1]+'-'+pp[0];}
+    // Ignore ANULADA
+    if(raw==='ANULADA') raw='';
+    inp.value=raw.substring(0,10)||'';;
     fg.appendChild(inp);
   } else {
     var inp2=document.createElement('input'); inp2.type='text'; inp2.id='EC-INPUT';
