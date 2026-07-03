@@ -946,7 +946,7 @@ function buildDatos(emp,es2,c){
   var fields=[
     ['Nombre',         'nombre',      getField(emp,es2,'nombre'),      'text',   null],
     ['DNI / NIE',      'dni',         emp.dni,                          'text',   null],
-    ['F. Nacimiento',  'nacimiento',  fd(emp.nacimiento),               'date',   null],
+    ['F. Nacimiento',  'nacimiento',  fd(getField(emp,es2,'nacimiento')||emp.nacimiento),  'date',   null],
     ['Email',          'email',       getField(emp,es2,'email'),        'text',   null],
     ['Telefono',       'telefono',    getField(emp,es2,'telefono'),     'text',   null],
     ['Cuenta bancaria','cuenta',      es2.cuenta||getField(emp,es2,'cuenta'), 'text', null],
