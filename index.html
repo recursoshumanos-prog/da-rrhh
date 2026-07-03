@@ -687,18 +687,19 @@ var FESTIVOS = {
 };
 
 function esFestivo(fecha){
-  var iso = fecha.toISOString().substring(0,10);
   var y = fecha.getFullYear();
+  var mo = String(fecha.getMonth()+1).padStart(2,'0');
+  var d = String(fecha.getDate()).padStart(2,'0');
+  var iso = y+'-'+mo+'-'+d;
   var list = FESTIVOS[y] || FESTIVOS[2026];
   return list.indexOf(iso) >= 0;
 }
 
+function parseFecha(s){var p=s.split('-');return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));}
 function diasLaborables(f1, f2){
-  // Count working days between two dates (inclusive), excluding weekends and festivos
   var count = 0;
-  var cur = new Date(f1);
-  var end = new Date(f2);
-  cur.setHours(0,0,0,0); end.setHours(0,0,0,0);
+  var cur = parseFecha(f1);
+  var end = parseFecha(f2);
   while(cur <= end){
     var dow = cur.getDay();
     if(dow !== 0 && dow !== 6 && !esFestivo(cur)) count++;
@@ -708,7 +709,7 @@ function diasLaborables(f1, f2){
 }
 
 function diasNaturales(f1, f2){
-  var d1 = new Date(f1); var d2 = new Date(f2);
+  var d1=parseFecha(f1); var d2=parseFecha(f2);
   return Math.round((d2-d1)/86400000)+1;
 }
 
