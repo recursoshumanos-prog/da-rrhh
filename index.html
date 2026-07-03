@@ -317,6 +317,14 @@ main{display:flex;flex:1;overflow:hidden}
         </select>
       </div>
     </div>
+    <div class="fg" id="fg-ano-dev" style="display:none">
+      <label>Año de devengo</label>
+      <select id="RANO">
+        <option value="2026">2026</option>
+        <option value="2027">2027</option>
+        <option value="2025">2025 (arrastre)</option>
+      </select>
+    </div>
     <div class="fg"><label>Observaciones</label><textarea id="ROBS" rows="2"></textarea></div>
     <div class="ma">
       <button class="btn btn-o" onclick="closeModal('MR')">Cancelar</button>
@@ -731,22 +739,22 @@ function calcVacaciones(emp,ano){
   var diasTrabajados=hasta>desde?Math.round((hasta-desde)/86400000):0;
   var dias=hasta>desde?Math.round(diasAno*diasTrabajados/365):0;
 
-  // Calculate actually used days from records - use proper counting
+  // Calculate used days - use ano_devengo if set, otherwise use f1 year
   var recs=(es2.records||[]).filter(function(r){
-    return r.tipo==='vacaciones'&&r.f1&&r.f1.substring(0,4)===''+anoActual;
+    if(r.tipo!=='vacaciones') return false;
+    var anoRec = r.ano_devengo ? parseInt(r.ano_devengo) : parseInt((r.f1||'').substring(0,4));
+    return anoRec===anoActual;
   });
   var disfrutadas=0;
   recs.forEach(function(r){
     if(r.estado==='disfrutado'||r.estado==='aprobado'){
+      var d;
       if(r.f1&&r.f2){
-        // Recalculate days properly
-        var d = educar ? diasNaturales(r.f1,r.f2) : diasLaborables(r.f1,r.f2);
-        disfrutadas += d;
-        // Update the record's dias field with correct count
-        r.dias = ''+d;
+        d = educar ? diasNaturales(r.f1,r.f2) : diasLaborables(r.f1,r.f2);
       } else {
-        disfrutadas+=parseFloat(r.dias||0);
+        d = parseFloat(r.dias||0);
       }
+      disfrutadas += d;
     }
   });
   var pendientes=Math.max(0,dias-disfrutadas);
@@ -1005,13 +1013,16 @@ function buildDatos(emp,es2,c){
 function buildVacaciones(emp,es2,c){
   var vac=calcVacaciones(emp);
 
-  // Summary cards
+  // Summary - current year + next year adelantos
+  var hoyAno = new Date().getFullYear();
+  var vac = calcVacaciones(emp, hoyAno);
+  var vac2 = calcVacaciones(emp, hoyAno+1);
   var vcg=document.createElement('div'); vcg.className='vac-grid';
   var vcards=[
-    {n:vac.generadas,l:'Generadas ('+vac.tipo+')',cls:'info'},
-    {n:vac.disfrutadas,l:'Disfrutadas',cls:'ok'},
-    {n:vac.pendientes,l:'Pendientes',cls:vac.pendientes>0?'warn':'ok'},
-    {n:vac.solicitadas,l:'Solicitudes pendientes',cls:vac.solicitadas>0?'warn':'neutral'},
+    {n:vac.generadas,l:'Generadas '+hoyAno+' ('+vac.tipo+')',cls:'info'},
+    {n:vac.disfrutadas,l:'Disfrutadas '+hoyAno,cls:'ok'},
+    {n:vac.pendientes,l:'Pendientes '+hoyAno,cls:vac.pendientes>0?'warn':'ok'},
+    {n:vac.solicitadas,l:'Solicitadas '+hoyAno,cls:vac.solicitadas>0?'warn':'neutral'},
   ];
   vcards.forEach(function(v){
     var div=document.createElement('div'); div.className='vac-card '+v.cls;
@@ -1020,6 +1031,25 @@ function buildVacaciones(emp,es2,c){
     div.appendChild(n); div.appendChild(l); vcg.appendChild(div);
   });
   c.appendChild(vcg);
+  // Show next year adelantos if any
+  if(vac2.disfrutadas>0){
+    var vcg2=document.createElement('div'); vcg2.className='vac-grid';
+    vcg2.style.cssText='margin-top:-.3rem;margin-bottom:.75rem';
+    var vcards2=[
+      {n:vac2.generadas,l:'Generadas '+(hoyAno+1),cls:'info'},
+      {n:vac2.disfrutadas,l:'Adelantados '+(hoyAno+1),cls:'warn'},
+      {n:Math.max(0,vac2.generadas-vac2.disfrutadas),l:'Disponibles '+(hoyAno+1),cls:'neutral'},
+      {n:0,l:'',cls:'neutral'},
+    ];
+    vcards2.forEach(function(v){
+      var div=document.createElement('div'); div.className='vac-card '+v.cls;
+      if(!v.l){div.style.visibility='hidden';}
+      var n=document.createElement('div'); n.className='vn'; n.textContent=v.n;
+      var l=document.createElement('div'); l.className='vl'; l.textContent=v.l;
+      div.appendChild(n); div.appendChild(l); vcg2.appendChild(div);
+    });
+    c.appendChild(vcg2);
+  }
 
   // Section tabs: Vacaciones | Absentismo
   var stabs=document.createElement('div'); stabs.className='section-tabs';
@@ -1081,7 +1111,8 @@ function buildRecItem(r,dni){
   tit.appendChild(tk);
   if(r.subtipo){var sp=document.createTextNode(' '+r.subtipo); tit.appendChild(sp);}
   var dates=document.createElement('div'); dates.className='rec-dates';
-  dates.textContent=fd(r.f1)+(r.f2&&r.f2!==r.f1?' al '+fd(r.f2):'')+(r.dias?' ('+r.dias+' dias)':'');
+  var anoTag = (r.ano_devengo&&r.tipo==='vacaciones') ? ' ['+r.ano_devengo+']' : '';
+  dates.textContent=fd(r.f1)+(r.f2&&r.f2!==r.f1?' al '+fd(r.f2):'')+(r.dias?' ('+r.dias+' dias)':'')+anoTag;
   var estat=document.createElement('span'); estat.className='estado-badge est-'+(r.estado||'apr').substring(0,3);
   estat.style.marginLeft='.35rem'; estat.textContent=r.estado||'aprobado';
   dates.appendChild(estat);
@@ -1223,7 +1254,13 @@ function saveEdit(){
 // ============================================================
 // MODAL RECORDS
 // ============================================================
-function openModal(id){ document.getElementById(id).classList.add('open'); }
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='MR'){
+    document.getElementById('fg-ano-dev').style.display='none';
+    document.getElementById('RANO').value=''+new Date().getFullYear();
+  }
+}
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
 function updMR(){
@@ -1232,6 +1269,11 @@ function updMR(){
   document.getElementById('LF1').textContent=isVac?'Fecha inicio':'Fecha inicio';
   document.getElementById('LF2').textContent=isVac?'Fecha fin':'Fecha fin';
   document.getElementById('REST').value=isVac?'solicitado':'aprobado';
+  document.getElementById('fg-ano-dev').style.display=isVac?'block':'none';
+  if(isVac){
+    var hoy=new Date();
+    document.getElementById('RANO').value=''+hoy.getFullYear();
+  }
   autoCalcDias();
 }
 
@@ -1270,12 +1312,14 @@ function saveRec(){
     diasCalc = calcDias(f1,f2);
   }
   var diasInput = document.getElementById('RD').value;
+  var anoDevengo = tipo==='vacaciones' ? (document.getElementById('RANO').value||''+new Date().getFullYear()) : '';
   var r={
     id:Date.now()+'',tipo:tipo,
     f1:f1,f2:f2,
     dias:diasInput||''+diasCalc,
     estado:document.getElementById('REST').value,
-    obs:document.getElementById('ROBS').value.trim()
+    obs:document.getElementById('ROBS').value.trim(),
+    ano_devengo: anoDevengo
   };
   ges(cDni).records.push(r);
   closeModal('MR');
