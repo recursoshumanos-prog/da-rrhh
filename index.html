@@ -645,6 +645,14 @@ function mF(e){
   else if(cF==='ACT') { socOk=true; estOk=est==='ACTIVO'; }
   else if(cF==='BAJ') { socOk=true; estOk=est==='BAJA'; }
   else if(cF==='IT') { socOk=true; estOk=est==='IT'; }
+  else if(cF==='PP') {
+    socOk=true;
+    var hoyPP=new Date(); var hoyIsoP=hoyPP.toISOString().substring(0,10);
+    var en30P=new Date(hoyPP); en30P.setDate(en30P.getDate()+30); var en30IsoP=en30P.toISOString().substring(0,10);
+    var pp=getField(e,ges(e.dni),'periodo_prueba_fin');
+    estOk=est==='ACTIVO'&&pp&&pp!=='-'&&pp!=='ANULADA'&&pp.length>4&&pp>=hoyIsoP&&pp<=en30IsoP;
+    return socOk&&estOk;
+  }
   else if(cF==='ASCENT') { socOk=e.sociedad.indexOf('ASCENT')>=0; }
   else if(cF==='BOWIE') { socOk=e.sociedad.indexOf('BOWIE')>=0; }
   else if(cF==='EDUCAR') { socOk=e.sociedad.indexOf('EDUCAR')>=0||e.sociedad.indexOf('FORMACION')>=0; }
@@ -891,7 +899,7 @@ function buildAlerts(){
     var ch=document.createElement('div');ch.className='alert-chip '+cls;ch.innerHTML=txt;
         ch.onclick=function(){
       var socFilters=['ASCENT','BOWIE','EDUCAR','DESKO','QUANTUM'];
-      var estFilters=['ACT','BAJ','IT'];
+      var estFilters=['ACT','BAJ','IT','PP'];
       if(estFilters.indexOf(extraFilter)>=0){
         if(socFilters.indexOf(cF)>=0){
           cF2=extraFilter;
@@ -916,7 +924,7 @@ function buildAlerts(){
   if(disc_abiertos>0) addChip('&#9878; '+disc_abiertos+' disc. abiertos','danger','ACT');
   if(it_open>0) addChip('&#127979; '+it_open+' IT abiertas','warn','IT');
   if(vacPend>0) addChip('&#127958; '+vacPend+' vac. pendientes','warn','ACT');
-  if(prueba_pronto>0) addChip('&#9201; '+prueba_pronto+' fin periodo prueba','warn','ACT');
+  if(prueba_pronto>0) addChip('&#9201; '+prueba_pronto+' fin periodo prueba','warn','PP');
   if(bar.children.length===0) bar.style.display='none'; else bar.style.display='flex';
 }
 
