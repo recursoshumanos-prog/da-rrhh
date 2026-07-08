@@ -672,10 +672,12 @@ function mF(e){
     return socOk&&estOk;
   }
   else if(cF==='DV') {
+    if(getEstado(e)==='BAJA') return false;
     var alDV=alDoc(getField(e,ges(e.dni),'caducidad_doc')||e.caducidad_doc);
     return alDV.k==='av2';
   }
   else if(cF==='DP') {
+    if(getEstado(e)==='BAJA') return false;
     var alDP=alDoc(getField(e,ges(e.dni),'caducidad_doc')||e.caducidad_doc);
     return alDP.k==='ap';
   }
