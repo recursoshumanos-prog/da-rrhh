@@ -1792,14 +1792,24 @@ function saveNewEmp() {
     errEl.style.display = 'block'; return;
   }
 
-  // Generate archivo number
+  // Generate archivo number - find highest existing + 1
   var soc_prefix = {'ASCENT LEGAL STRATEGIES SOCIEDAD LIM':1,'ASESORÍA BOWIE, S.L':2,
     'CENTRO DE FORMACION EDUCAR SIN FRONTERAS':3,'DESKO HISPANOAMERICANA CORPORATION S':4,
     'QUANTUM LEGAL SERVICES, SOCIEDAD LIM':5};
   var pfx = soc_prefix[sociedad] || 0;
-  var count = EMPS_BASE.filter(function(e){return e.sociedad===sociedad;}).length +
-              EXTRA_EMPS.filter(function(e){return e.sociedad===sociedad;}).length;
-  var archivo = pfx + '.' + count;
+  var allEmps = EMPS_BASE.concat(EXTRA_EMPS);
+  var maxNum = -1;
+  allEmps.forEach(function(e){
+    var eSoc = (e.edits&&e.edits.sociedad)||e.sociedad||'';
+    if(eSoc===sociedad && e.archivo){
+      var parts = String(e.archivo).split('.');
+      if(parts.length===2){
+        var n = parseInt(parts[1]);
+        if(!isNaN(n) && n > maxNum) maxNum = n;
+      }
+    }
+  });
+  var archivo = pfx + '.' + (maxNum + 1);
 
   var jornada = document.getElementById('NE-jornada').value || '100';
   var horas = Math.round(parseFloat(jornada)/100*40*100)/100;
