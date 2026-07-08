@@ -889,18 +889,24 @@ function buildAlerts(){
   bar.innerHTML='';
   function addChip(txt,cls,extraFilter){
     var ch=document.createElement('div');ch.className='alert-chip '+cls;ch.innerHTML=txt;
-    ch.onclick=function(){
+        ch.onclick=function(){
       var socFilters=['ASCENT','BOWIE','EDUCAR','DESKO','QUANTUM'];
-      if(socFilters.indexOf(cF)>=0){
-        // Keep sociedad, set estado as secondary
-        cF2=extraFilter;
+      var estFilters=['ACT','BAJ','IT'];
+      if(estFilters.indexOf(extraFilter)>=0){
+        if(socFilters.indexOf(cF)>=0){
+          cF2=extraFilter;
+        } else {
+          cF=extraFilter; cF2='';
+        }
+      } else if(extraFilter==='ALL'){
+        cF='ALL'; cF2='';
       } else {
-        // No sociedad active, set as primary
         cF=extraFilter; cF2='';
-        document.querySelectorAll('.fb').forEach(function(b){
-          b.classList.toggle('on',b.getAttribute('data-f')===extraFilter);
-        });
       }
+      document.querySelectorAll('.fb').forEach(function(x){
+        var f=x.getAttribute('data-f');
+        x.classList.toggle('on', f===cF||(cF2&&f===cF2));
+      });
       renderList();
     };
     bar.appendChild(ch);
