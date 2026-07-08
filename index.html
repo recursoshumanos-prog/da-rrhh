@@ -208,6 +208,24 @@ main{display:flex;flex:1;overflow:hidden}
 .divider{height:1px;background:var(--b);margin:.65rem 0}
 .tag{display:inline-block;padding:.06rem .28rem;border-radius:2px;font-size:.62rem;background:rgba(255,255,255,.07);color:var(--mu);margin-right:.2rem}
 </style>
+
+<script>
+// Force cache refresh on every load
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    regs.forEach(function(r){r.unregister();});
+  });
+}
+// Check if we have the latest version
+var htmlVer = '20260708_v5';
+var storedVer = sessionStorage.getItem('da_rrhh_ver');
+if(storedVer && storedVer !== htmlVer){
+  sessionStorage.setItem('da_rrhh_ver', htmlVer);
+  window.location.reload(true);
+} else {
+  sessionStorage.setItem('da_rrhh_ver', htmlVer);
+}
+</script>
 </head>
 <body>
 
