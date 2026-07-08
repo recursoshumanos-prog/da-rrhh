@@ -653,6 +653,25 @@ function mF(e){
     estOk=est==='ACTIVO'&&pp&&pp!=='-'&&pp!=='ANULADA'&&pp.length>4&&pp>=hoyIsoP&&pp<=en30IsoP;
     return socOk&&estOk;
   }
+  else if(cF==='DV') {
+    var alDV=alDoc(getField(e,ges(e.dni),'caducidad_doc')||e.caducidad_doc);
+    return alDV.k==='av2';
+  }
+  else if(cF==='DP') {
+    var alDP=alDoc(getField(e,ges(e.dni),'caducidad_doc')||e.caducidad_doc);
+    return alDP.k==='ap';
+  }
+  else if(cF==='VM') {
+    var hoyVM=new Date();
+    var mesIniVM=new Date(hoyVM.getFullYear(),hoyVM.getMonth(),1).toISOString().substring(0,10);
+    var mesFinVM=new Date(hoyVM.getFullYear(),hoyVM.getMonth()+1,0).toISOString().substring(0,10);
+    return (ges(e.dni).records||[]).some(function(r){
+      return r.tipo==='vacaciones'&&r.f1&&r.f2&&r.f1<=mesFinVM&&r.f2>=mesIniVM&&(r.estado==='aprobado'||r.estado==='disfrutado');
+    });
+  }
+  else if(cF==='DA') {
+    return (ges(e.dni).disciplinario||[]).some(function(d){return d.estado==='abierto';});
+  }
   else if(cF==='ASCENT') { socOk=e.sociedad.indexOf('ASCENT')>=0; }
   else if(cF==='BOWIE') { socOk=e.sociedad.indexOf('BOWIE')>=0; }
   else if(cF==='EDUCAR') { socOk=e.sociedad.indexOf('EDUCAR')>=0||e.sociedad.indexOf('FORMACION')>=0; }
@@ -877,7 +896,7 @@ function updStats(){
 // ALERTS BAR
 // ============================================================
 function buildAlerts(){
-  var vencidos=0,pronto=0,vacPend=0,disc_abiertos=0,it_open=0,prueba_pronto=0;
+  var vencidos=0,pronto=0,vacPend=0,vacMes=0,disc_abiertos=0,it_open=0,prueba_pronto=0;
   var hoy=new Date(); var hoyIso=hoy.toISOString().substring(0,10);
   var en30=new Date(hoy); en30.setDate(en30.getDate()+30); var en30Iso=en30.toISOString().substring(0,10);
   EMPS_BASE.forEach(function(e){
@@ -885,6 +904,13 @@ function buildAlerts(){
     var al=alDoc(getField(e,es2,'caducidad_doc')||e.caducidad_doc);
     if(al.k==='av2')vencidos++;else if(al.k==='ap')pronto++;
     var v=calcVacaciones(e); if(v.pendientes>5)vacPend++;
+    // Check if employee is on vacation this month
+    var mesIni=new Date(hoy.getFullYear(),hoy.getMonth(),1).toISOString().substring(0,10);
+    var mesFin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0).toISOString().substring(0,10);
+    var enVacMes=(ges(e.dni).records||[]).some(function(r){
+      return r.tipo==='vacaciones'&&r.f1&&r.f2&&r.f1<=mesFin&&r.f2>=mesIni&&(r.estado==='aprobado'||r.estado==='disfrutado');
+    });
+    if(enVacMes) vacMes++;
     (es2.disciplinario||[]).forEach(function(d){if(d.estado==='abierto')disc_abiertos++;});
     (es2.records||[]).forEach(function(r){if(r.tipo&&r.tipo.indexOf('it-')===0&&(!r.f2||r.f2>=hoyIso))it_open++;});
     // Periodo de prueba ending in next 30 days
@@ -899,7 +925,7 @@ function buildAlerts(){
     var ch=document.createElement('div');ch.className='alert-chip '+cls;ch.innerHTML=txt;
         ch.onclick=function(){
       var socFilters=['ASCENT','BOWIE','EDUCAR','DESKO','QUANTUM'];
-      var estFilters=['ACT','BAJ','IT','PP'];
+      var estFilters=['ACT','BAJ','IT','PP','DV','DP','VM','DA'];
       if(estFilters.indexOf(extraFilter)>=0){
         if(socFilters.indexOf(cF)>=0){
           cF2=extraFilter;
@@ -919,11 +945,11 @@ function buildAlerts(){
     };
     bar.appendChild(ch);
   }
-  if(vencidos>0) addChip('&#128308; '+vencidos+' docs vencidos','danger','ALL');
-  if(pronto>0) addChip('&#128992; '+pronto+' docs pronto','warn','ALL');
-  if(disc_abiertos>0) addChip('&#9878; '+disc_abiertos+' disc. abiertos','danger','ACT');
+  if(vencidos>0) addChip('&#128308; '+vencidos+' docs vencidos','danger','DV');
+  if(pronto>0) addChip('&#128992; '+pronto+' docs pronto','warn','DP');
+
   if(it_open>0) addChip('&#127979; '+it_open+' IT abiertas','warn','IT');
-  if(vacPend>0) addChip('&#127958; '+vacPend+' vac. pendientes','warn','ACT');
+  if(vacPend>0) addChip('&#127958; '+vacMes+' vac. este mes','warn','VM');
   if(prueba_pronto>0) addChip('&#9201; '+prueba_pronto+' fin periodo prueba','warn','PP');
   if(bar.children.length===0) bar.style.display='none'; else bar.style.display='flex';
 }
