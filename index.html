@@ -222,7 +222,7 @@ if('serviceWorker' in navigator){
   });
 }
 // Check if we have the latest version
-var htmlVer = '20260804_v2';
+var htmlVer = '20260804_v3';
 var storedVer = sessionStorage.getItem('da_rrhh_ver');
 if(storedVer && storedVer !== htmlVer){
   sessionStorage.setItem('da_rrhh_ver', htmlVer);
@@ -1689,14 +1689,21 @@ function runReport(tipo){
 </div>
 
 <div class="mo" id="MIM">
-  <div class="md" style="width:500px">
-    <h3>Importar vacaciones</h3>
-    <p style="font-size:.77rem;color:var(--mu);margin-bottom:.75rem">Pega el contenido de tu tabla de vacaciones con columnas separadas por tabulador. Formatos aceptados: Nombre / F.Inicio / F.Fin / Dias  o  Nombre / Despacho / Puesto / DiasCorresp / F.Inicio / F.Fin / DiasSOL</p>
-    <div class="fg"><label>Datos (pegar desde Excel)</label>
-      <textarea id="IMP-DATA" rows="8" style="font-family:monospace;font-size:.71rem" placeholder="EMPLEADO/A	FECHA INICIO	FECHA FIN	DIAS
-Maria Garcia	01/07/2026	15/07/2026	12"></textarea>
+  <div class="md" style="width:560px">
+    <h3>&#128229; Importar vacaciones desde Excel</h3>
+    <p style="font-size:.77rem;color:var(--mu);margin-bottom:.5rem">
+      Copia y pega desde Excel. Cabecera obligatoria en primera fila.<br>
+      <strong>Formato requerido:</strong> DNI &nbsp;|&nbsp; FECHA INICIO &nbsp;|&nbsp; FECHA FIN &nbsp;|&nbsp; DIAS (opcional) &nbsp;|&nbsp; AÑO DEVENGO (opcional)
+    </p>
+    <div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:5px;padding:.5rem .75rem;font-size:.72rem;color:var(--bl);margin-bottom:.65rem">
+      &#128161; Si no pones días, los calcula automáticamente (laborables para todas las sociedades excepto Educar que usa naturales).<br>
+      &#128161; Si no pones año de devengo, lo asigna según el saldo disponible — el exceso pasa automáticamente a 2027.
     </div>
-    <div id="IMP-RES" style="font-size:.75rem;min-height:1.2rem;margin:.4rem 0"></div>
+    <div class="fg"><label>Pegar datos desde Excel (Tab-separado)</label>
+      <textarea id="IMP-DATA" rows="8" style="font-family:monospace;font-size:.71rem" placeholder="DNI&#9;FECHA INICIO&#9;FECHA FIN&#9;DIAS&#9;AÑO DEVENGO&#10;12345678A&#9;01/07/2026&#9;15/07/2026&#9;&#9;&#10;Z1234567B&#9;01/08/2026&#9;15/08/2026&#9;11&#9;2026"></textarea>
+    </div>
+    <div id="IMP-RES" style="font-size:.75rem;min-height:1.5rem;margin:.4rem 0;padding:.4rem;border-radius:4px"></div>
+    <div id="IMP-DETAIL" style="font-size:.7rem;color:var(--mu);max-height:120px;overflow-y:auto;margin-bottom:.4rem"></div>
     <div class="ma">
       <button class="btn btn-o" onclick="closeModal('MIM')">Cancelar</button>
       <button class="btn btn-r" onclick="doImport()">Importar</button>
@@ -1818,33 +1825,109 @@ function findByName(name) {
 function doImport() {
   var raw = document.getElementById('IMP-DATA').value.trim();
   var res = document.getElementById('IMP-RES');
+  var det = document.getElementById('IMP-DETAIL');
   if (!raw) { res.textContent='Pega los datos primero'; return; }
+
   var lines = raw.split('\n');
-  var ok=0, skip=0;
-  lines.forEach(function(line,idx) {
-    var p = line.split('\t');
-    if (p.length < 3) { skip++; return; }
-    var nombre=p[0].trim();
-    // Skip header rows
-    if (!nombre || nombre.toUpperCase().indexOf('EMPLEADO')>=0 || nombre.toUpperCase().indexOf('NOMBRE')>=0) return;
-    var f1,f2,dias;
-    if (p.length >= 7) { f1=p[4].trim(); f2=p[5].trim(); dias=p[6].trim(); }
-    else if (p.length >= 4) { f1=p[1].trim(); f2=p[2].trim(); dias=p[3].trim(); }
-    else { skip++; return; }
-    var pf1=piDate(f1), pf2=piDate(f2)||pf1;
-    if (!pf1) { skip++; return; }
-    var dni=findByName(nombre);
-    if (!dni) { skip++; return; }
-    var es2=ges(dni);
-    // Avoid duplicates
-    var dup=es2.records.some(function(r){return r.tipo==='vacaciones'&&r.f1===pf1&&r.f2===pf2;});
-    if (dup) { skip++; return; }
-    es2.records.push({id:'i'+Date.now()+'_'+ok,tipo:'vacaciones',f1:pf1,f2:pf2,dias:dias,estado:'aprobado',obs:'Importado'});
+  var ok=0, skip=0, errs=[];
+  var hoyAno = new Date().getFullYear();
+
+  // Skip header row (first line)
+  var startIdx = 0;
+  var firstLine = lines[0].split('\t');
+  if(firstLine[0] && isNaN(firstLine[0].trim()) &&
+     (firstLine[0].toUpperCase().indexOf('DNI')>=0 ||
+      firstLine[0].toUpperCase().indexOf('NIF')>=0 ||
+      firstLine[0].toUpperCase().indexOf('EMPLEADO')>=0 ||
+      firstLine[0].toUpperCase().indexOf('NOMBRE')>=0)) {
+    startIdx = 1;
+  }
+
+  lines.slice(startIdx).forEach(function(line) {
+    var p = line.split('\t').map(function(x){return x.trim();});
+    if(p.length < 3 || !p[0]) { skip++; return; }
+
+    var dni = p[0].toUpperCase().replace(/[^A-Z0-9]/g,'');
+    var f1raw = p[1], f2raw = p[2];
+    var diasManual = p[3] ? parseFloat(p[3]) : null;
+    var anoManual = p[4] ? parseInt(p[4]) : null;
+
+    if(!dni || !f1raw || !f2raw) { skip++; errs.push('Fila sin datos: '+line.substring(0,30)); return; }
+
+    // Parse dates dd/mm/yyyy or yyyy-mm-dd
+    function parseDate(s) {
+      s = s.replace(/-/g,'/');
+      var pp = s.split('/');
+      if(pp.length!==3) return null;
+      if(pp[2].length===4) return pp[2]+'-'+pp[1].padStart(2,'0')+'-'+pp[0].padStart(2,'0');
+      if(pp[0].length===4) return pp[0]+'-'+pp[1].padStart(2,'0')+'-'+pp[2].padStart(2,'0');
+      return null;
+    }
+    var f1 = parseDate(f1raw), f2 = parseDate(f2raw);
+    if(!f1||!f2) { skip++; errs.push('Fecha invalida para DNI '+dni); return; }
+
+    // Find employee by DNI
+    var emp = null;
+    for(var i=0;i<EMPS_BASE.length;i++){
+      if(EMPS_BASE[i].dni.toUpperCase().replace(/[^A-Z0-9]/g,'')===dni){emp=EMPS_BASE[i];break;}
+    }
+    if(!emp && ST['_extra'] && ST['_extra'].extra_emps){
+      for(var j=0;j<ST['_extra'].extra_emps.length;j++){
+        if(ST['_extra'].extra_emps[j].dni.toUpperCase().replace(/[^A-Z0-9]/g,'')===dni){emp=ST['_extra'].extra_emps[j];break;}
+      }
+    }
+    if(!emp) { skip++; errs.push('DNI no encontrado: '+dni); return; }
+
+    // Check duplicate
+    var es2 = ges(emp.dni);
+    var dup = (es2.records||[]).some(function(r){return r.tipo==='vacaciones'&&r.f1===f1&&r.f2===f2;});
+    if(dup) { skip++; errs.push('Duplicado: '+emp.nombre+' '+fd(f1)); return; }
+
+    // Calculate days
+    var soc = (es2.edits&&es2.edits.sociedad)||emp.sociedad||'';
+    var educar = isEducar(soc);
+    var diasCalc = diasManual!==null ? diasManual : (educar ? diasNaturales(f1,f2) : diasLaborables(f1,f2));
+
+    // Determine year of accrual
+    var anoDevengo = anoManual || hoyAno;
+    // If no manual year, use year of f1
+    if(!anoManual) anoDevengo = parseInt(f1.substring(0,4));
+
+    // Check balance and auto-split if needed
+    var vacBal = calcVacaciones(emp, anoDevengo);
+    var pendiente = vacBal ? vacBal.pendientes : 999;
+
+    if(diasCalc > pendiente && pendiente >= 0 && !anoManual) {
+      // Auto-split between years
+      var dias1 = Math.round(pendiente*10)/10;
+      var dias2 = Math.round((diasCalc-dias1)*10)/10;
+      if(dias1 > 0) {
+        es2.records.push({id:'imp_'+Date.now()+'_a_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
+          dias:''+dias1,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+      }
+      if(dias2 > 0) {
+        es2.records.push({id:'imp_'+Date.now()+'_b_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
+          dias:''+dias2,estado:'aprobado',obs:'Importado (exceso '+(anoDevengo+1)+')',ano_devengo:''+(anoDevengo+1)});
+      }
+      errs.push('&#9888; '+emp.nombre+': '+diasCalc+' dias repartidos ('+dias1+' en '+anoDevengo+' + '+dias2+' en '+(anoDevengo+1)+')');
+    } else {
+      es2.records.push({id:'imp_'+Date.now()+'_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
+        dias:''+diasCalc,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+    }
     ok++;
   });
+
   saveAll();
-  res.innerHTML='<span style="color:green">&#10003; '+ok+' importados</span>'+(skip?' <span style="color:var(--mu)">'+skip+' omitidos</span>':'');
-  if (ok>0 && cDni) setTimeout(function(){var e=getEmp(cDni);if(e)renderDetail(e);},1200);
+
+  // Show results
+  if(ok>0){
+    res.style.background='rgba(63,185,80,.1)';res.style.color='var(--success)';
+    res.innerHTML='&#10003; '+ok+' registros importados correctamente'+(skip?' ('+skip+' omitidos)':'');
+  } else {
+    res.style.background='rgba(248,81,73,.1)';res.style.color='var(--dg)';
+    res.innerHTML='&#10007; No se importo ningun registro. '+skip+' omitidos.';
+  }
+  det.innerHTML = errs.map(function(e){return '<div>'+e+'</div>';}).join('');
 }
 </script>
 
