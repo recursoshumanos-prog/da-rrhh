@@ -1,0 +1,2834 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Portal RRHH - Distrito de Abogados</title>
+<style>
+:root{
+  --r:#C8102E;--r2:#a00d24;--d:#f6f8fa;--m:#ffffff;--m2:#f0f3f6;
+  --g:#e8b931;--gr:#2ecc71;--t:#1f2328;--mu:#57606a;--b:#d0d7de;
+  --dg:#f85149;--w:#d29922;--bl:#388bfd;--pu:#bc8cff;
+  --success:#3fb950;--info:#58a6ff;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif;background:var(--d);color:var(--t);height:100vh;overflow:hidden;font-size:13px}
+
+/* LOGIN */
+#LS{position:fixed;inset:0;background:linear-gradient(135deg,#0969da,#0550ae,#033d8b);display:flex;align-items:center;justify-content:center;z-index:99}
+.lb{background:var(--m);border:1px solid var(--b);border-radius:12px;padding:2.2rem 2.5rem;width:320px;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.4)}
+.ll{font-size:1.5rem;font-weight:700;color:var(--r);letter-spacing:1px;margin-bottom:.25rem}
+.ls{color:var(--mu);font-size:.8rem;margin-bottom:1.5rem}
+#PI,#EI{width:100%;padding:.7rem .9rem;background:var(--m2);border:1px solid var(--b);border-radius:6px;color:var(--t);font-size:.9rem;margin-bottom:.6rem;outline:none;transition:.2s}
+#PI:focus,#EI:focus{border-color:var(--r)}
+#LB{width:100%;padding:.75rem;background:var(--r);border:none;border-radius:6px;color:#fff;font-size:.9rem;font-weight:600;cursor:pointer;transition:.2s}
+#LB:hover{background:var(--r2)}
+#LE{color:var(--dg);font-size:.78rem;margin-top:.4rem;display:none;padding:.4rem;background:rgba(248,81,73,.1);border-radius:4px}
+
+/* LAYOUT */
+#APP{display:none;height:100vh;flex-direction:column}
+.topbar{background:var(--m);border-bottom:1px solid var(--b);padding:.5rem 1rem;display:flex;align-items:center;gap:.75rem;flex-shrink:0;height:44px}
+.tlogo{font-weight:700;color:var(--r);font-size:.95rem;letter-spacing:.5px}
+.tsep{color:var(--b);font-size:1.2rem}
+.ttitle{color:var(--mu);font-size:.8rem}
+.tright{margin-left:auto;display:flex;gap:.4rem;align-items:center}
+.tsave{font-size:.7rem;color:var(--success)}
+.sync-dot{width:7px;height:7px;border-radius:50%;background:#ccc;display:inline-block;margin-right:.25rem}
+.sync-dot.ok{background:var(--success)}.sync-dot.err{background:var(--dg)}.sync-dot.loading{background:var(--w);animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.btn{padding:.32rem .7rem;border:none;border-radius:5px;cursor:pointer;font-size:.75rem;font-weight:500;transition:.15s;display:inline-flex;align-items:center;gap:.3rem}
+.btn-r{background:var(--r);color:#fff}.btn-r:hover{background:var(--r2)}
+.btn-o{background:transparent;border:1px solid var(--b);color:var(--mu)}.btn-o:hover{border-color:var(--t);color:var(--t)}
+.btn-g{background:var(--g);color:#1a1a2e;font-weight:600}.btn-g:hover{opacity:.9}
+.btn-gr{background:var(--success);color:#0f1117}.btn-gr:hover{opacity:.9}
+.btn-bl{background:var(--bl);color:#0f1117}.btn-bl:hover{opacity:.9}
+.btn-sm{padding:.22rem .5rem;font-size:.7rem}
+.btn-xs{padding:.15rem .38rem;font-size:.65rem}
+
+main{display:flex;flex:1;overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{width:268px;background:var(--m);border-right:1px solid var(--b);display:flex;flex-direction:column;flex-shrink:0}
+.ss{padding:.5rem .5rem .3rem}
+.ss input{width:100%;padding:.42rem .65rem;background:var(--m2);border:1px solid var(--b);border-radius:5px;color:var(--t);font-size:.78rem;outline:none}
+.ss input:focus{border-color:var(--bl)}
+.sf{padding:.28rem .5rem;border-bottom:1px solid var(--b);display:flex;gap:.2rem;flex-wrap:wrap}
+.fb{padding:.18rem .35rem;border:1px solid var(--b);border-radius:3px;background:transparent;color:var(--mu);font-size:.62rem;cursor:pointer;transition:.12s}
+.fb:hover{border-color:var(--mu)}.fb.on{background:var(--r);border-color:var(--r);color:#fff}
+.stats{padding:.28rem .5rem;border-bottom:1px solid var(--b);display:flex;gap:.22rem}
+.sc{flex:1;text-align:center;background:rgba(255,255,255,.03);border-radius:3px;padding:.2rem .1rem;cursor:pointer}
+.sc:hover{background:rgba(255,255,255,.06)}
+.sc .n{font-size:.88rem;font-weight:700}.sc .l{font-size:.56rem;color:var(--mu)}
+#EL{overflow-y:auto;flex:1}
+.ei{padding:.42rem .5rem;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;display:flex;align-items:center;gap:.38rem;transition:.1s}
+.ei:hover{background:rgba(255,255,255,.04)}.ei.on{background:rgba(200,16,46,.1);border-left:2px solid var(--r)}
+.av{width:27px;height:27px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;flex-shrink:0}
+.en{font-size:.75rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:160px}
+.esb{font-size:.62rem;color:var(--mu)}
+.badge{display:inline-block;padding:.08rem .3rem;border-radius:2px;font-size:.6rem;font-weight:700;white-space:nowrap}
+.b-act{background:rgba(63,185,80,.15);color:var(--success)}
+.b-baj{background:rgba(248,81,73,.15);color:var(--dg)}
+.b-it{background:rgba(188,140,255,.15);color:var(--pu)}
+.b-exc{background:rgba(210,153,34,.15);color:var(--w)}
+.b-mat{background:rgba(88,166,255,.15);color:var(--info)}
+
+/* DETAIL */
+.detail{flex:1;overflow-y:auto;background:var(--d)}
+.empty-det{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:var(--mu);gap:.5rem}
+
+/* PROFILE HEADER */
+.ph{background:var(--m);border-bottom:1px solid var(--b);padding:.85rem 1.1rem;display:flex;align-items:center;gap:1rem;flex-shrink:0}
+.pa{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.95rem;font-weight:700;flex-shrink:0}
+.pname{font-size:1rem;font-weight:700;margin-bottom:.12rem}
+.pmeta{color:var(--mu);font-size:.75rem;margin-bottom:.22rem}
+.pbadges{display:flex;gap:.3rem;flex-wrap:wrap;align-items:center}
+.pac-v{font-size:.62rem;padding:.08rem .3rem;border-radius:2px;font-weight:600}
+.av2{background:rgba(248,81,73,.2);color:var(--dg)}
+.ap{background:rgba(210,153,34,.2);color:var(--w)}
+.ao{background:rgba(63,185,80,.2);color:var(--success)}
+.as{background:rgba(125,133,144,.15);color:var(--mu)}
+.pactions{margin-left:auto;display:flex;gap:.35rem;align-items:center}
+
+/* TABS */
+.tabs{background:var(--m);border-bottom:1px solid var(--b);padding:0 1rem;display:flex;gap:0;flex-shrink:0}
+.tab{padding:.5rem .85rem;font-size:.75rem;font-weight:500;color:var(--mu);cursor:pointer;border-bottom:2px solid transparent;transition:.15s;white-space:nowrap}
+.tab:hover{color:var(--t)}.tab.on{color:var(--r);border-bottom-color:var(--r)}
+
+/* TAB CONTENT */
+.tcontent{padding:1rem 1.1rem;overflow-y:auto}
+
+/* INFO CARDS GRID */
+.cg{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:.5rem;margin-bottom:.75rem}
+.ic{background:var(--m);border:1px solid var(--b);border-radius:6px;padding:.55rem .65rem;position:relative}
+.ic .l{font-size:.6rem;color:var(--mu);text-transform:uppercase;letter-spacing:.04em;margin-bottom:.12rem}
+.ic .v{font-size:.8rem;font-weight:500;word-break:break-word}
+.ic .edit-btn{position:absolute;top:.35rem;right:.35rem;opacity:0;transition:.15s}
+.ic:hover .edit-btn{opacity:1}
+.ic input,.ic select{width:100%;background:var(--m2);border:1px solid var(--bl);border-radius:3px;color:var(--t);font-size:.78rem;padding:.2rem .35rem;outline:none;margin-top:.1rem}
+
+/* SECTION BOX */
+.sbox{background:var(--m);border:1px solid var(--b);border-radius:8px;padding:.75rem;margin-bottom:.75rem}
+.shead{display:flex;align-items:center;justify-content:space-between;margin-bottom:.6rem}
+.stitle{font-size:.82rem;font-weight:600;display:flex;align-items:center;gap:.4rem}
+.sicon{font-size:.9rem}
+
+/* VACACIONES SUMMARY */
+.vac-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:.5rem;margin-bottom:.75rem}
+.vac-card{background:var(--m2);border:1px solid var(--b);border-radius:6px;padding:.6rem;text-align:center}
+.vac-card .vn{font-size:1.4rem;font-weight:700;margin-bottom:.15rem}
+.vac-card .vl{font-size:.65rem;color:var(--mu)}
+.vac-card.ok .vn{color:var(--success)}
+.vac-card.warn .vn{color:var(--w)}
+.vac-card.info .vn{color:var(--info)}
+.vac-card.neutral .vn{color:var(--mu)}
+
+/* RECORDS */
+.rec-item{background:var(--m2);border:1px solid var(--b);border-radius:5px;padding:.52rem .65rem;margin-bottom:.35rem;display:flex;align-items:flex-start;gap:.5rem}
+.rec-dot{width:6px;height:6px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.rec-body{flex:1}
+.rec-title{font-size:.78rem;font-weight:500;margin-bottom:.05rem}
+.rec-dates{font-size:.68rem;color:var(--mu);margin-bottom:.03rem}
+.rec-note{font-size:.7rem;color:var(--mu);font-style:italic}
+.rec-actions{display:flex;gap:.25rem;flex-shrink:0}
+.tk{font-size:.58rem;padding:.07rem .28rem;border-radius:2px;font-weight:600;display:inline-block}
+.tk-vac{background:rgba(88,166,255,.2);color:var(--info);--dot:#388bfd}
+.tk-per{background:rgba(63,185,80,.2);color:var(--success);--dot:#3fb950}
+.tk-it{background:rgba(188,140,255,.2);color:var(--pu);--dot:#bc8cff}
+.tk-amo{background:rgba(210,153,34,.2);color:var(--w);--dot:#d29922}
+.tk-san{background:rgba(248,81,73,.2);color:var(--dg);--dot:#f85149}
+.tk-aus{background:rgba(125,133,144,.2);color:var(--mu);--dot:#7d8590}
+
+.estado-badge{font-size:.6rem;padding:.06rem .3rem;border-radius:2px;font-weight:600}
+.est-sol{background:rgba(210,153,34,.2);color:var(--w)}
+.est-apr{background:rgba(63,185,80,.2);color:var(--success)}
+.est-rej{background:rgba(248,81,73,.2);color:var(--dg)}
+.est-dis{background:rgba(88,166,255,.2);color:var(--info)}
+
+/* HISTORIAL */
+.hist-item{border-left:2px solid var(--b);padding:.35rem 0 .35rem .65rem;margin-bottom:.3rem;position:relative}
+.hist-item::before{content:'';width:7px;height:7px;border-radius:50%;background:var(--b);position:absolute;left:-4.5px;top:.5rem}
+.hist-fecha{font-size:.65rem;color:var(--mu);margin-bottom:.1rem}
+.hist-campo{font-size:.73rem;font-weight:500}
+.hist-vals{font-size:.7rem;color:var(--mu)}
+.hist-user{font-size:.63rem;color:var(--bl);margin-top:.05rem}
+
+/* NOTAS */
+.nota-item{background:var(--m2);border:1px solid var(--b);border-left:3px solid var(--g);border-radius:5px;padding:.55rem .65rem;margin-bottom:.35rem}
+.nota-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.25rem}
+.nota-meta{font-size:.65rem;color:var(--mu)}
+.nota-text{font-size:.78rem;line-height:1.5}
+
+/* DISCIPLINARIO */
+.disc-item{background:var(--m2);border:1px solid rgba(248,81,73,.25);border-radius:5px;padding:.55rem .65rem;margin-bottom:.35rem}
+.disc-head{display:flex;align-items:center;gap:.4rem;margin-bottom:.22rem}
+.disc-tipo{font-size:.7rem;font-weight:600;color:var(--dg)}
+.disc-fecha{font-size:.65rem;color:var(--mu)}
+
+/* ALERTS */
+.alert-bar{display:flex;gap:.35rem;flex-wrap:wrap;padding:.4rem .5rem;border-bottom:1px solid var(--b);background:rgba(210,153,34,.05)}
+.alert-chip{display:flex;align-items:center;gap:.25rem;padding:.2rem .45rem;border-radius:3px;font-size:.68rem;cursor:pointer;transition:.12s}
+.alert-chip.warn{background:rgba(210,153,34,.15);color:var(--w);border:1px solid rgba(210,153,34,.3)}
+.alert-chip.danger{background:rgba(248,81,73,.15);color:var(--dg);border:1px solid rgba(248,81,73,.3)}
+.alert-chip:hover{opacity:.8}
+
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;display:none;align-items:center;justify-content:center}
+.mo.open{display:flex}
+.md{background:var(--m);border:1px solid var(--b);border-radius:10px;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto;padding:1.15rem;box-shadow:0 16px 48px rgba(0,0,0,.5)}
+.md h3{margin-bottom:.85rem;font-size:.9rem;font-weight:600;border-bottom:1px solid var(--b);padding-bottom:.5rem}
+.fg{margin-bottom:.58rem}
+.fg label{display:block;font-size:.7rem;color:var(--mu);margin-bottom:.2rem}
+.fg input,.fg select,.fg textarea{width:100%;padding:.45rem .65rem;background:var(--m2);border:1px solid var(--b);border-radius:5px;color:var(--t);font-size:.78rem;outline:none;transition:.15s}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--bl)}
+.fg select option{background:var(--m)}
+.fg textarea{resize:vertical;min-height:60px;line-height:1.5}
+.fr2{display:grid;grid-template-columns:1fr 1fr;gap:.45rem}
+.ma{display:flex;justify-content:flex-end;gap:.3rem;margin-top:.75rem;padding-top:.55rem;border-top:1px solid var(--b)}
+
+/* REPORTS MODAL */
+.rep-grid{display:grid;grid-template-columns:1fr 1fr;gap:.45rem;margin-bottom:.75rem}
+.rep-card{background:var(--m2);border:1px solid var(--b);border-radius:6px;padding:.75rem;cursor:pointer;transition:.15s;display:flex;align-items:center;gap:.55rem}
+.rep-card:hover{border-color:var(--g);background:rgba(232,185,49,.05)}
+.rep-icon{font-size:1.4rem;flex-shrink:0}
+.rep-name{font-size:.78rem;font-weight:600;margin-bottom:.08rem}
+.rep-desc{font-size:.65rem;color:var(--mu)}
+
+/* SEMAFORO */
+.sem{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:.25rem}
+.sem-g{background:var(--success)}.sem-y{background:var(--w)}.sem-r{background:var(--dg)}
+
+.empty-s{text-align:center;padding:1.2rem;color:var(--mu);font-size:.75rem}
+.section-tabs{display:flex;gap:.2rem;margin-bottom:.65rem;border-bottom:1px solid var(--b);padding-bottom:.4rem}
+.stab{padding:.25rem .6rem;font-size:.72rem;border-radius:3px;cursor:pointer;color:var(--mu);transition:.12s}
+.stab.on{background:rgba(56,139,253,.15);color:var(--info)}
+.stab:hover{color:var(--t)}
+
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-thumb{background:#c8d1da;border-radius:2px}
+.divider{height:1px;background:var(--b);margin:.65rem 0}
+.contrato-hist{background:var(--m2);border:1px solid var(--b);border-left:3px solid var(--bl);border-radius:5px;padding:.6rem .75rem;margin-bottom:.4rem}
+.contrato-hist .ch-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:.2rem}
+.contrato-hist .ch-tipo{font-size:.75rem;font-weight:600;color:var(--bl)}
+.contrato-hist .ch-fechas{font-size:.68rem;color:var(--mu)}
+.contrato-hist .ch-motivo{font-size:.7rem;color:var(--mu);font-style:italic}
+.contract-link-banner{background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.25);border-radius:6px;padding:.55rem .75rem;margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem;font-size:.78rem}
+.contract-link-banner .cl-icon{font-size:1rem;flex-shrink:0}
+.contract-link-banner .cl-text{flex:1}
+.contract-link-banner .cl-badge{background:rgba(56,139,253,.15);color:var(--bl);font-size:.65rem;padding:.1rem .35rem;border-radius:3px;font-weight:600;cursor:pointer}
+.contract-link-banner .cl-badge:hover{background:rgba(56,139,253,.3)}
+.contract-prev-banner{background:rgba(210,153,34,.08);border:1px solid rgba(210,153,34,.25);border-radius:6px;padding:.55rem .75rem;margin-bottom:.65rem;display:flex;align-items:center;gap:.5rem;font-size:.78rem}
+.contract-prev-banner .cl-badge{background:rgba(210,153,34,.15);color:var(--w);font-size:.65rem;padding:.1rem .35rem;border-radius:3px;font-weight:600;cursor:pointer}
+.contract-prev-banner .cl-badge:hover{background:rgba(210,153,34,.3)}
+.tag{display:inline-block;padding:.06rem .28rem;border-radius:2px;font-size:.62rem;background:rgba(255,255,255,.07);color:var(--mu);margin-right:.2rem}
+</style>
+
+<script>
+// Force cache refresh on every load
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    regs.forEach(function(r){r.unregister();});
+  });
+}
+// Check if we have the latest version
+var htmlVer = '20260907_v4';
+var storedVer = sessionStorage.getItem('da_rrhh_ver');
+if(storedVer && storedVer !== htmlVer){
+  sessionStorage.setItem('da_rrhh_ver', htmlVer);
+  window.location.reload(true);
+} else {
+  sessionStorage.setItem('da_rrhh_ver', htmlVer);
+}
+</script>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="LS">
+  <div class="lb">
+    <div class="ll">DA &middot; RRHH</div>
+    <div class="ls">Portal de Gestion de Empleados</div>
+    <div id="LFORM">
+      <input type="email" id="EI" placeholder="Correo" autocomplete="username">
+      <input type="password" id="PI" placeholder="Contrasena" autocomplete="current-password">
+      <button id="LB">Acceder</button>
+    </div>
+    <div id="SETUP" style="display:none;text-align:left">
+      <div style="font-size:.82rem;font-weight:600;margin-bottom:.4rem">Primera configuracion</div>
+      <div style="font-size:.76rem;line-height:1.4;margin-bottom:.7rem">La base de empleados todavia no esta cargada. Selecciona el archivo <b>base-portal-rrhh.json</b>. Solo hay que hacerlo una vez.</div>
+      <input type="file" id="SETUP-FILE" accept=".json,application/json" style="font-size:.78rem;width:100%;margin-bottom:.6rem">
+      <button id="SETUP-BTN" style="width:100%;padding:.75rem;background:var(--r);border:none;border-radius:6px;color:#fff;font-size:.9rem;font-weight:600;cursor:pointer">Cargar base de empleados</button>
+    </div>
+    <div id="LE"></div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="APP">
+  <div class="topbar">
+    <span class="tlogo">DA</span>
+    <span class="tsep">/</span>
+    <span class="ttitle">Portal RRHH</span><span id="PVER" style="font-size:10px;opacity:.55;margin-left:8px"></span>
+    <div class="tright">
+      <span class="sync-dot" id="SDOT"></span><span class="tsave" id="SLBL"></span>
+      <button class="btn btn-r btn-sm" onclick="openNewEmp()">&#43; Nuevo empleado</button><button class="btn btn-o btn-sm" onclick="openImport()">&#128229; Importar</button><button class="btn btn-o btn-sm" onclick="openGestionDespachos()">&#127970; Despachos</button><button class="btn btn-o btn-sm" onclick="openReports()">&#128202; Informes</button>
+      <button class="btn btn-g btn-sm" onclick="saveAll()">&#128190; Guardar</button>
+      <button class="btn btn-o btn-sm" onclick="doLogout()" title="Cerrar sesion">Salir</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="ss"><input type="text" id="SRCH" placeholder="Buscar nombre, DNI, N registro..." oninput="renderList()"></div>
+      <div class="sf">
+        <button class="fb on" data-f="ALL" onclick="setF(this)">Todos</button>
+        <button class="fb" data-f="ASCENT" onclick="setF(this)">Ascent</button>
+        <button class="fb" data-f="BOWIE" onclick="setF(this)">Bowie</button>
+        <button class="fb" data-f="EDUCAR" onclick="setF(this)">Educar</button>
+        <button class="fb" data-f="DESKO" onclick="setF(this)">Desko</button>
+        <button class="fb" data-f="QUANTUM" onclick="setF(this)">Quantum</button>
+        <button class="fb" data-f="ACT" onclick="setF(this)">Activos</button>
+        <button class="fb" data-f="BAJ" onclick="setF(this)">Bajas</button>
+        <button class="fb" data-f="IT" onclick="setF(this)">IT</button>
+      </div>
+      <div class="stats">
+        <div class="sc" onclick="setFbyName('ALL')"><div class="n" id="N1">0</div><div class="l">Total</div></div>
+        <div class="sc" onclick="setFbyName('ACT')"><div class="n" id="N2" style="color:var(--success)">0</div><div class="l">Activos</div></div>
+        <div class="sc" onclick="setFbyName('BAJ')"><div class="n" id="N3" style="color:var(--dg)">0</div><div class="l">Bajas</div></div>
+        <div class="sc" onclick="setFbyName('IT')"><div class="n" id="N4" style="color:var(--pu)">0</div><div class="l">IT</div></div>
+      </div>
+      <div id="EL"></div>
+    </div>
+
+    <!-- DETAIL -->
+    <div class="detail" id="DET">
+      <div class="empty-det">
+        <div style="font-size:2.5rem">&#128100;</div>
+        <div>Selecciona un empleado del listado</div>
+        <div style="font-size:.75rem">O usa el buscador para localizar por nombre, DNI o N&deg; registro</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- MODAL REGISTRO (vacaciones/absentismo/IT) -->
+<div class="mo" id="MR">
+  <div class="md">
+    <h3 id="MR-title">Nuevo registro</h3>
+    <div class="fg"><label>Tipo</label>
+      <select id="RT" onchange="updMR()">
+        <optgroup label="Vacaciones">
+          <option value="vacaciones">Vacaciones</option>
+        </optgroup>
+        <optgroup label="Permisos retribuidos (Convenio Oficinas y Despachos)">
+          <option value="permiso-matrimonio">Matrimonio (15 dias)</option>
+          <option value="permiso-nacimiento">Nacimiento hijo (3 dias)</option>
+          <option value="permiso-fallecimiento1">Fallecimiento conyugue/hijo/padre (3 dias)</option>
+          <option value="permiso-fallecimiento2">Fallecimiento familiar 2o grado (2 dias)</option>
+          <option value="permiso-hospitalizacion">Hospitalizacion familiar (2 dias)</option>
+          <option value="permiso-traslado">Traslado domicilio (1 dia)</option>
+          <option value="permiso-medico">Cita medica</option>
+          <option value="permiso-deber">Deber publico inexcusable</option>
+          <option value="permiso-lactancia">Lactancia</option>
+          <option value="permiso-otros">Otros permiso retribuido</option>
+        </optgroup>
+        <optgroup label="Ausencias">
+          <option value="it-comun">IT Enfermedad comun</option>
+          <option value="it-accidente-lab">IT Accidente laboral</option>
+          <option value="it-accidente-itin">IT Accidente in itinere</option>
+          <option value="maternidad">Maternidad/Paternidad</option>
+          <option value="ausencia-injust">Ausencia injustificada</option>
+          <option value="retraso">Retraso</option>
+          <option value="otros">Otros</option>
+        </optgroup>
+      </select>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label id="LF1">Fecha inicio</label><input type="date" id="RF1" oninput="autoCalcDias()"></div>
+      <div class="fg"><label id="LF2">Fecha fin</label><input type="date" id="RF2" oninput="autoCalcDias()"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Dias</label><input type="number" id="RD" min="0" step="0.5" placeholder="Auto"></div>
+      <div class="fg"><label>Estado</label>
+        <select id="REST">
+          <option value="solicitado">Solicitado</option>
+          <option value="aprobado">Aprobado</option>
+          <option value="disfrutado">Disfrutado</option>
+          <option value="rechazado">Rechazado</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg" id="fg-ano-dev" style="display:none">
+      <label>Año de devengo</label>
+      <select id="RANO">
+        <option value="2026">2026</option>
+        <option value="2027">2027</option>
+        <option value="2025">2025 (arrastre)</option>
+      </select>
+    </div>
+    <div class="fg"><label>Observaciones</label><textarea id="ROBS" rows="2"></textarea></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MR')">Cancelar</button>
+      <button class="btn btn-r" onclick="saveRec()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL DISCIPLINARIO -->
+<div class="mo" id="MD">
+  <div class="md">
+    <h3>Registro disciplinario</h3>
+    <div class="fg"><label>Tipo</label>
+      <select id="DT">
+        <option value="amo-verbal">Amonestacion verbal</option>
+        <option value="amo-escrita">Amonestacion escrita</option>
+        <option value="sancion-emp">Sancion empleo y sueldo</option>
+        <option value="expediente">Expediente contradictorio</option>
+        <option value="despido-disc">Despido disciplinario</option>
+        <option value="disc-otros">Otros</option>
+      </select>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Fecha del hecho</label><input type="date" id="DFH"></div>
+      <div class="fg"><label>Fecha comunicacion</label><input type="date" id="DFC"></div>
+    </div>
+    <div class="fg"><label>Descripcion de los hechos</label><textarea id="DDESC" rows="3"></textarea></div>
+    <div class="fg"><label>Personas implicadas</label><input type="text" id="DIMP" placeholder="Nombres..."></div>
+    <div class="fg"><label>Estado</label>
+      <select id="DEST">
+        <option value="abierto">Abierto</option>
+        <option value="en-tramite">En tramite</option>
+        <option value="resuelto">Resuelto</option>
+        <option value="archivado">Archivado</option>
+      </select>
+    </div>
+    <div class="fg"><label>Observaciones</label><textarea id="DOBS" rows="2"></textarea></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MD')">Cancelar</button>
+      <button class="btn btn-r" onclick="saveDisc()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL NOTA -->
+<div class="mo" id="MN">
+  <div class="md" style="width:420px">
+    <h3>Nueva nota interna</h3>
+    <div class="fg"><label>Nota</label><textarea id="NTXT" rows="5" placeholder="Escribe la nota..."></textarea></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MN')">Cancelar</button>
+      <button class="btn btn-r" onclick="saveNota()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL EDITAR CAMPO -->
+<div class="mo" id="MEC">
+  <div class="md" style="width:380px">
+    <h3 id="MEC-title">Editar campo</h3>
+    <div class="fg" id="MEC-body"></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MEC')">Cancelar</button>
+      <button class="btn btn-r" onclick="saveEdit()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL INFORMES -->
+<div class="mo" id="MREP">
+  <div class="md" style="width:520px">
+    <h3>&#128202; Informes y exportaciones</h3>
+    <div class="rep-grid">
+      <div class="rep-card" onclick="genReport('vacaciones')"><div class="rep-icon">&#127958;</div><div><div class="rep-name">Vacaciones</div><div class="rep-desc">Generadas, disfrutadas y pendientes</div></div></div>
+      <div class="rep-card" onclick="genReport('absentismo')"><div class="rep-icon">&#128197;</div><div><div class="rep-name">Absentismo</div><div class="rep-desc">Permisos, IT y ausencias</div></div></div>
+      <div class="rep-card" onclick="genReport('disciplinario')"><div class="rep-icon">&#9878;</div><div><div class="rep-name">Disciplinario</div><div class="rep-desc">Amonestaciones y sanciones</div></div></div>
+      <div class="rep-card" onclick="genReport('salarial')"><div class="rep-icon">&#128176;</div><div><div class="rep-name">Salarial</div><div class="rep-desc">Salarios por empleado y sociedad</div></div></div>
+      <div class="rep-card" onclick="genReport('cuentas')"><div class="rep-icon">&#127981;</div><div><div class="rep-name">Cuentas bancarias</div><div class="rep-desc">IBAN empleados activos</div></div></div>
+      <div class="rep-card" onclick="genReport('caducidades')"><div class="rep-icon">&#128196;</div><div><div class="rep-name">Caducidad docs</div><div class="rep-desc">NIE/Pasaporte con alertas</div></div></div>
+      <div class="rep-card" onclick="genReport('bbdd')"><div class="rep-icon">&#128203;</div><div><div class="rep-name">BBDD completa</div><div class="rep-desc">Todos los datos de empleados</div></div></div>
+      <div class="rep-card" onclick="genReport('historial')"><div class="rep-icon">&#128336;</div><div><div class="rep-name">Historial cambios</div><div class="rep-desc">Modificaciones registradas</div></div></div>
+    </div>
+    <div class="ma"><button class="btn btn-o" onclick="closeModal('MREP')">Cerrar</button></div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+var EMPS_BASE = [];      // la base de empleados ya no va en este archivo: se carga de Supabase tras iniciar sesion
+var EXTRA_EMPS = [];
+var CODES = {"100": "Indefinido tiempo completo", "101": "Indefinido t.completo fomento", "109": "Indefinido t.completo discapacidad", "200": "Indefinido tiempo parcial", "201": "Indefinido t.parcial fomento", "209": "Indefinido t.parcial discapacidad", "300": "Fijo-discontinuo jornada completa", "33": "Practicas profesionales", "44": "Formacion en alternancia", "246": "Indefinido t.parcial interinidad", "402": "Temporal produccion t.completo", "502": "Temporal produccion t.parcial", "410": "Sustitucion t.completo", "510": "Sustitucion t.parcial"};
+var SOCS = ["ASCENT LEGAL STRATEGIES SOCIEDAD LIM", "ASESORIA BOWIE, S.L", "ASESOR\u00cdA BOWIE, S.L", "CENTRO DE FORMACION EDUCAR SIN FRONTERAS", "DESKO HISPANOAMERICANA CORPORATION S", "QUANTUM LEGAL SERVICES, SOCIEDAD LIM"];
+var DESPS = ["CARABANCHEL", "DOCTOR ESQUERDO", "MATAMALA", "MU 108", "MU 113", "MU 119", "MU 126", "MU 35", "MU 53", "MU 64", "MU 65", "MU 93", "OPORTO", "ROTA", "VALLECAS 108", "VALLECAS 76", "VALLECAS 9"];
+var ESTADOS_LIST = ["ACTIVO", "BAJA", "IT", "EXCEDENCIA", "MATERNIDAD/PATERNIDAD", "SUSPENSION"];
+
+// UTF-8 safe base64 decoder (atob() is latin-1 only)
+function b64decode(s){
+  try {
+    return decodeURIComponent(atob(s).split('').map(function(c){
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+  } catch(e) {
+    return atob(s);
+  }
+}
+
+function findRelatedContracts(dni, currentSoc) {
+  // Find all employees with same DNI but different society
+  var related = [];
+  EMPS_BASE.forEach(function(e) {
+    if(e.dni === dni && e.sociedad !== currentSoc) {
+      var es2 = ges(e.dni + '_' + e.archivo) || ges(e.dni);
+      var soc = getField(e, ges(e.dni), 'sociedad') || e.sociedad;
+      if(soc !== currentSoc) {
+        related.push({
+          emp: e,
+          estado: getEstado(e),
+          inicio: getField(e, ges(e.dni), 'inicio') || e.inicio,
+          archivo: e.archivo,
+          sociedad: soc
+        });
+      }
+    }
+  });
+  return related;
+}
+
+function socShort(s) {
+  if(!s) return '-';
+  if(s.indexOf('ASCENT')>=0) return 'Ascent';
+  if(s.indexOf('BOWIE')>=0) return 'Bowie';
+  if(s.indexOf('EDUCAR')>=0||s.indexOf('FORMACION')>=0) return 'Educar';
+  if(s.indexOf('DESKO')>=0) return 'Desko';
+  if(s.indexOf('QUANTUM')>=0) return 'Quantum';
+  return s.substring(0,10);
+}
+
+function getNextArchivo(sociedad, pfx, excludeDni){
+  // Build the most complete employee list possible
+  var seen = {};
+  var allE = [];
+  // 1. Start with EMPS_BASE
+  EMPS_BASE.forEach(function(e){ if(!seen[e.dni]){seen[e.dni]=1;allE.push(e);} });
+  // 2. Add ST._extra (from Supabase)
+  var stEx = (ST['_extra']&&ST['_extra'].extra_emps)||[];
+  stEx.forEach(function(e){ if(!seen[e.dni]){seen[e.dni]=1;allE.push(e);} });
+  // 3. Add local EXTRA_EMPS
+  EXTRA_EMPS.forEach(function(e){ if(!seen[e.dni]){seen[e.dni]=1;allE.push(e);} });
+
+  var maxN = -1;
+  allE.forEach(function(e){
+    if(excludeDni && e.dni===excludeDni) return;
+    // Get true sociedad (edits override base)
+    var st2 = ST[e.dni]||{};
+    var eSoc = (st2.edits&&st2.edits.sociedad)||e.sociedad||'';
+    if(eSoc !== sociedad) return;
+    // Get true archivo (edits override base)
+    var eArch = (st2.edits&&st2.edits.archivo)||e.archivo||'';
+    if(!eArch) return;
+    var pts = String(eArch).split('.');
+    if(pts.length===2 && pts[0]===String(pfx)){
+      var n = parseInt(pts[1]);
+      if(!isNaN(n) && n > maxN) maxN = n;
+    }
+  });
+  return pfx+'.'+(maxN+1);
+}
+
+function buildDespachoOptions(selectId, selectedVal){
+  var sel = document.getElementById(selectId);
+  if(!sel) return;
+  sel.innerHTML = '<option value="">-- Selecciona --</option>';
+  DESPS.forEach(function(d){
+    var opt = document.createElement('option');
+    opt.value = d; opt.textContent = d;
+    if(d === selectedVal) opt.selected = true;
+    sel.appendChild(opt);
+  });
+}
+var SB_URL = 'https://yykvtpdhgrvvvevnteth.supabase.co';
+var SB_KEY = 'sb_publishable_0ucHozGNGjmaAXLUOXoekA_su7ki6lk'; // clave PUBLICA: por si sola no da acceso a ningun dato
+var SB_BASE = 'rrhh_base';
+var SB_TABLE = 'rrhh_portal';
+var _sb = null;
+var _syncInterval = null;
+var LSK = 'da_rrhh_v2';
+var USER = 'RRHH';
+
+// State: {dni: {records,disciplinario,notas,historial,edits,cuenta}}
+var ST = {};
+
+var PRELOADED = {};
+var BACKUP_STATE = {};
+
+function mergePreloaded(fillOnly) {
+  var d;
+  function cp(x){ return JSON.parse(JSON.stringify(x)); }
+  // Merge backup state first (vacation records etc already entered)
+  for (d in BACKUP_STATE) {
+    if (d === '_extra') continue;
+    if (!ST[d] || (fillOnly && isEmptyEntry(ST[d]) && _snap[d]===undefined)) { ST[d] = cp(BACKUP_STATE[d]); }
+    else if (!fillOnly) {
+      // Merge records
+      var byId = {};
+      (ST[d].records||[]).forEach(function(r){ byId[r.id]=r; });
+      (BACKUP_STATE[d].records||[]).forEach(function(r){ if(!byId[r.id]) byId[r.id]=r; });
+      ST[d].records = Object.values(byId);
+      if ((BACKUP_STATE[d].notas||[]).length > (ST[d].notas||[]).length) ST[d].notas = cp(BACKUP_STATE[d].notas);
+      if ((BACKUP_STATE[d].disciplinario||[]).length > (ST[d].disciplinario||[]).length) ST[d].disciplinario = cp(BACKUP_STATE[d].disciplinario);
+      if ((BACKUP_STATE[d].historial||[]).length > (ST[d].historial||[]).length) ST[d].historial = cp(BACKUP_STATE[d].historial);
+      if (BACKUP_STATE[d].edits && Object.keys(BACKUP_STATE[d].edits).length > 0)
+        ST[d].edits = Object.assign({}, BACKUP_STATE[d].edits, ST[d].edits||{});
+      if (BACKUP_STATE[d].cuenta && !ST[d].cuenta) ST[d].cuenta = BACKUP_STATE[d].cuenta;
+    }
+  }
+  // Then preloaded vacations
+  for (d in PRELOADED) {
+    if (!ST[d]) { ST[d] = cp(PRELOADED[d]); }
+    else if (!fillOnly && (!ST[d].records || ST[d].records.length === 0)) {
+      ST[d].records = cp(PRELOADED[d].records);
+    }
+  }
+  // Empleados creados en el portal: union por DNI (lo guardado + la copia incluida en el archivo)
+  var bx = (BACKUP_STATE['_extra'] && BACKUP_STATE['_extra'].extra_emps) || [];
+  if (bx.length || ST['_extra']) {
+    if (!ST['_extra']) ST['_extra'] = {records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+    ST['_extra'].extra_emps = unionExtras(ST['_extra'].extra_emps||[], cp(bx));
+  }
+  syncExtra();
+}
+
+var cDni = null;
+var cF = 'ALL';
+var cTab = 'datos';
+var editField = null;
+var editOldVal = null;
+
+// ============================================================
+// INIT
+// ============================================================
+var PORTAL_VERSION = 'v3.0';
+var LSK_PEND = 'da_rrhh_pending';
+var _snap = {};            // ultimo estado visto en Supabase, por clave (JSON)
+var _remoteLoaded = false; // ya se ha leido Supabase en esta sesion
+var _saving = false;
+var _saveAgain = false;
+var _saveSeq = 0;
+var _dirty = false;        // hay cambios locales sin confirmar en Supabase
+var _useCas = true;        // escritura condicionada: solo si nadie ha guardado entre la lectura y la escritura
+
+var LSK_SESS = 'da_rrhh_sesion';
+var _sess = null;        // sesion de Supabase Auth: {access_token, refresh_token, expires_at, email}
+var _refreshing = null;
+var _appStarted = false;
+
+window.onload = function() {
+  document.getElementById('LB').onclick = doLogin;
+  document.getElementById('PI').onkeydown = function(e){ if(e.key==='Enter') doLogin(); };
+  document.getElementById('EI').onkeydown = function(e){ if(e.key==='Enter') document.getElementById('PI').focus(); };
+  document.getElementById('SETUP-BTN').onclick = doSetupImport;
+  try{ var s=localStorage.getItem(LSK); if(s) ST=JSON.parse(s); }catch(x){}
+  if(!ST || typeof ST!=='object' || Array.isArray(ST)) ST={};
+  try{ if(localStorage.getItem(LSK_PEND)==='1') _dirty=true; }catch(x){}
+  var v=document.getElementById('PVER'); if(v) v.textContent=PORTAL_VERSION;
+  // si se ha recargado la pagina con la sesion abierta, se recupera sin volver a pedir la contraseña
+  var saved=null;
+  try{ saved=JSON.parse(sessionStorage.getItem(LSK_SESS)||'null'); }catch(x){}
+  if(saved && saved.refresh_token){
+    _sess={access_token:'', refresh_token:saved.refresh_token, expires_at:0, email:''};
+    loginMsg('Recuperando sesion...', true);
+    refreshSession().then(function(){ loginMsg(''); enterApp(); })
+    .catch(function(){ _sess=null; clearSavedSession(); loginMsg(''); document.getElementById('EI').focus(); });
+  } else {
+    document.getElementById('EI').focus();
+  }
+};
+
+function loginMsg(msg, neutral){
+  var el=document.getElementById('LE');
+  el.textContent=msg||'';
+  el.style.display=msg?'block':'none';
+  el.style.color=neutral?'var(--t)':'';
+  el.style.background=neutral?'transparent':'';
+}
+function showLogin(msg){
+  document.getElementById('LFORM').style.display='block';
+  document.getElementById('SETUP').style.display='none';
+  document.getElementById('LS').style.display='flex';
+  loginMsg(msg||'');
+  var b=document.getElementById('LB'); b.disabled=false; b.textContent='Acceder';
+}
+function clearSavedSession(){ try{ sessionStorage.removeItem(LSK_SESS); }catch(x){} }
+function setSession(d){
+  _sess={
+    access_token: d.access_token,
+    refresh_token: d.refresh_token,
+    expires_at: Date.now() + ((d.expires_in||3600)*1000),
+    email: (d.user&&d.user.email)||(_sess&&_sess.email)||''
+  };
+  try{ sessionStorage.setItem(LSK_SESS, JSON.stringify({refresh_token:_sess.refresh_token})); }catch(x){}
+}
+function authCall(grant, body){
+  return fetch(SB_URL+'/auth/v1/token?grant_type='+grant, {
+    method:'POST',
+    headers:{ 'apikey': SB_KEY, 'Content-Type':'application/json' },
+    body: JSON.stringify(body)
+  }).then(function(r){
+    return r.json().catch(function(){ return {}; }).then(function(j){ return {ok:r.ok, status:r.status, data:j||{}}; });
+  });
+}
+// Renueva la sesion (caduca cada hora). Si Supabase la rechaza, hay que volver a entrar.
+function refreshSession(){
+  if(_refreshing) return _refreshing;
+  if(!_sess || !_sess.refresh_token){ var e0=new Error('sin sesion'); e0.auth=true; return Promise.reject(e0); }
+  _refreshing = authCall('refresh_token', {refresh_token:_sess.refresh_token}).then(function(res){
+    _refreshing=null;
+    if(!res.ok || !res.data.access_token){
+      var e=new Error('sesion no renovada ('+res.status+')');
+      e.auth = (res.status>=400 && res.status<500);
+      throw e;
+    }
+    setSession(res.data);
+  }, function(err){ _refreshing=null; throw err; });
+  return _refreshing;
+}
+function sessionExpired(){
+  _sess=null; clearSavedSession();
+  setSyncStatus('err','Sesion caducada');
+  showLogin('La sesion ha caducado. Vuelve a entrar; no se pierde nada de lo que tenias en pantalla.');
+}
+// Todas las llamadas a los datos pasan por aqui: clave publica + sesion del usuario
+function sbFetch(url, opts){
+  opts=opts||{};
+  function go(){
+    var h={}, k;
+    for(k in (opts.headers||{})) h[k]=opts.headers[k];
+    h['apikey']=SB_KEY;
+    h['Authorization']='Bearer '+_sess.access_token;
+    var o={}; for(k in opts) o[k]=opts[k];
+    o.headers=h;
+    return fetch(url, o);
+  }
+  function fail(e){ if(e && e.auth) sessionExpired(); throw e; }
+  if(!_sess){ var e1=new Error('sin sesion'); e1.auth=true; return Promise.reject(e1); }
+  var ready = (Date.now() < _sess.expires_at - 60000) ? Promise.resolve() : refreshSession();
+  return ready.then(go, fail).then(function(r){
+    if(r.status!==401) return r;
+    return refreshSession().then(go, fail);
+  });
+}
+
+function doLogin(){
+  var em=document.getElementById('EI').value.trim(), pw=document.getElementById('PI').value;
+  if(!em || !pw){ loginMsg('Escribe el correo y la contrasena'); return; }
+  var b=document.getElementById('LB'); b.disabled=true; b.textContent='Entrando...';
+  loginMsg('');
+  authCall('password', {email:em, password:pw}).then(function(res){
+    if(!res.ok || !res.data.access_token){
+      b.disabled=false; b.textContent='Acceder';
+      loginMsg(res.status===400||res.status===401||res.status===422 ? 'Correo o contrasena incorrectos' : 'No se ha podido iniciar sesion (error '+res.status+')');
+      return;
+    }
+    setSession(res.data);
+    document.getElementById('PI').value='';
+    enterApp();
+  }).catch(function(){
+    b.disabled=false; b.textContent='Acceder';
+    loginMsg('Sin conexion. Intentalo de nuevo.');
+  });
+}
+function doLogout(){
+  if(_dirty && !confirm('Hay cambios pendientes de guardar. Si sales ahora se quedan guardados solo en este navegador hasta que vuelvas a entrar. ¿Salir?')) return;
+  var tok=_sess&&_sess.access_token;
+  function fin(){
+    _sess=null; clearSavedSession();
+    // la copia local de los datos solo se conserva si quedan cambios sin subir
+    if(!_dirty){ try{ localStorage.removeItem(LSK); }catch(x){} }
+    location.reload();
+  }
+  if(!tok){ fin(); return; }
+  fetch(SB_URL+'/auth/v1/logout?scope=local', {method:'POST', headers:{'apikey':SB_KEY,'Authorization':'Bearer '+tok}}).then(fin, fin);
+}
+
+// Tras iniciar sesion: comprobar permiso, cargar la base de empleados y arrancar
+function enterApp(){
+  if(_appStarted){
+    document.getElementById('LS').style.display='none';
+    setSyncStatus('ok','Sincronizado');
+    pollRemote();
+    return;
+  }
+  var b=document.getElementById('LB'); b.disabled=true; b.textContent='Cargando...';
+  checkAccess(function(estado){
+    if(estado==='ok'){ loadBase(); return; }
+    var msg = estado==='sin-permiso' ? 'Este usuario no tiene permiso para el portal.'
+            : estado==='sin-script' ? 'Falta ejecutar el script de permisos en Supabase (paso 2 de la guia).'
+            : estado==='sesion' ? '' 
+            : 'No se ha podido comprobar el acceso. Revisa la conexion e intentalo de nuevo.';
+    if(estado==='sin-permiso'){ _sess=null; clearSavedSession(); }
+    if(estado!=='sesion') showLogin(msg);
+  });
+}
+function checkAccess(cb){
+  sbFetch(SB_URL+'/rest/v1/rpc/rrhh_tiene_acceso', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'})
+  .then(function(r){
+    if(r.status===404){ cb('sin-script'); return null; }
+    if(!r.ok){ cb('error'); return null; }
+    return r.json().then(function(v){ cb(v===true ? 'ok' : 'sin-permiso'); });
+  }).catch(function(e){ cb(e&&e.auth ? 'sesion' : 'error'); });
+}
+function loadBase(){
+  sbFetch(SB_URL+'/rest/v1/'+SB_BASE+'?id=eq.1&select=contenido', {method:'GET'})
+  .then(function(r){
+    if(r.status===404){ showLogin('Falta ejecutar el script de permisos en Supabase (paso 2 de la guia).'); return null; }
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json().then(function(data){
+      if(!Array.isArray(data)) throw new Error('respuesta inesperada');
+      if(!data.length){ showSetup(); return; }
+      var obj=JSON.parse(data[0].contenido);
+      if(!obj || !Array.isArray(obj.emps_base) || !obj.emps_base.length) throw new Error('base vacia');
+      startApp(obj.emps_base);
+    });
+  }).catch(function(e){
+    if(e && e.auth) return;
+    console.error('Base:',e);
+    showLogin('No se ha podido cargar la base de empleados. Revisa la conexion e intentalo de nuevo.');
+  });
+}
+function showSetup(){
+  document.getElementById('LFORM').style.display='none';
+  document.getElementById('SETUP').style.display='block';
+  document.getElementById('LS').style.display='flex';
+  loginMsg('');
+}
+// Primera configuracion: sube la base de empleados a Supabase (una sola vez)
+function doSetupImport(){
+  var f=document.getElementById('SETUP-FILE').files[0];
+  if(!f){ loginMsg('Selecciona el archivo base-portal-rrhh.json'); return; }
+  var btn=document.getElementById('SETUP-BTN'); btn.disabled=true; btn.textContent='Cargando...';
+  function err(msg){ btn.disabled=false; btn.textContent='Cargar base de empleados'; loginMsg(msg); }
+  var rd=new FileReader();
+  rd.onerror=function(){ err('No se ha podido leer el archivo.'); };
+  rd.onload=function(){
+    var obj=null;
+    try{ obj=JSON.parse(rd.result); }catch(x){}
+    var okFile = obj && obj.tipo==='base-portal-rrhh' && Array.isArray(obj.emps_base) && obj.emps_base.length>0 &&
+      obj.emps_base.every(function(e){ return e && e.dni && e.nombre; });
+    if(!okFile){ err('Ese archivo no es la base del portal (base-portal-rrhh.json).'); return; }
+    var body=JSON.stringify({id:1, contenido: JSON.stringify({emps_base:obj.emps_base, importado:new Date().toISOString()})});
+    sbFetch(SB_URL+'/rest/v1/'+SB_BASE, {method:'POST', headers:{'Content-Type':'application/json','Prefer':'return=minimal'}, body:body})
+    .then(function(r){
+      if(r.status===409){ loadBase(); return; }          // ya la habia cargado el otro ordenador
+      if(r.status===401 || r.status===403){ err('Este usuario no tiene permiso para cargar la base.'); return; }
+      if(!r.ok){ err('No se ha podido guardar la base (error '+r.status+').'); return; }
+      // solo en esta primera carga: lo que hubiera en la copia antigua y falte en Supabase se rellena
+      if(isObj(obj.backup_state)) BACKUP_STATE=obj.backup_state;
+      if(isObj(obj.preloaded)) PRELOADED=obj.preloaded;
+      startApp(obj.emps_base);
+    }).catch(function(e){ if(e && e.auth) return; err('Sin conexion. Intentalo de nuevo.'); });
+  };
+  rd.readAsText(f);
+}
+function startApp(lista){
+  EMPS_BASE = JSON.parse(JSON.stringify(lista));
+  EXTRA_EMPS = [];
+  _appStarted = true;
+  document.getElementById('LS').style.display='none';
+  document.getElementById('APP').style.display='flex';
+  loadFromSupabase(function(){
+    mergePreloaded(_remoteLoaded);
+    syncExtra(); applyDniAliases(); loadDespachos();
+    renderList(); updStats(); buildAlerts();
+    startAutoSync();
+    if(_remoteLoaded && needsPush()) saveAll();
+  });
+}
+
+
+// ---------- utilidades de fusion ----------
+function normDni(d){ return String(d===undefined||d===null?'':d).toUpperCase().replace(/[^A-Z0-9]/g,''); }
+function jstr(v){ return v===undefined ? undefined : JSON.stringify(v); }
+function isObj(v){ return v && typeof v==='object' && !Array.isArray(v); }
+function isEmptyEntry(v){
+  if(!v || typeof v!=='object') return true;
+  for(var k in v){
+    var x=v[k];
+    if(Array.isArray(x)){ if(x.length) return false; }
+    else if(x && typeof x==='object'){ if(Object.keys(x).length) return false; }
+    else if(x!=='' && x!==null && x!==undefined) return false;
+  }
+  return true;
+}
+function snapshotOf(state){
+  var s={}; for(var k in state){ s[k]=JSON.stringify(state[k]); } return s;
+}
+function itemKey(it){
+  if(it && typeof it==='object' && it.id!==undefined && it.id!==null) return 'id:'+it.id;
+  return 'j:'+JSON.stringify(it);
+}
+// Fusion a tres bandas de listas (registros, notas, disciplinario, historial...)
+function mergeArr(L,R,S){
+  L=L||[]; R=R||[]; S=S||[];
+  var bS={}, bR={}, bL={}, out=[];
+  S.forEach(function(x){ bS[itemKey(x)]=x; });
+  R.forEach(function(x){ bR[itemKey(x)]=x; });
+  L.forEach(function(x){ bL[itemKey(x)]=1; });
+  L.forEach(function(x){
+    var k=itemKey(x);
+    var inS=bS.hasOwnProperty(k), inR=bR.hasOwnProperty(k);
+    if(inS && !inR){
+      // borrado en el otro ordenador: se respeta salvo que aqui se haya modificado
+      if(JSON.stringify(x)!==JSON.stringify(bS[k])) out.push(x);
+      return;
+    }
+    if(inS && inR && JSON.stringify(x)===JSON.stringify(bS[k])){ out.push(bR[k]); return; }
+    out.push(x);
+  });
+  R.forEach(function(x){
+    var k=itemKey(x);
+    if(bL.hasOwnProperty(k)) return;
+    if(bS.hasOwnProperty(k)) return; // borrado aqui
+    out.push(x);
+  });
+  return out;
+}
+// Fusion a tres bandas de objetos planos (edits)
+function mergeObj(L,R,S){
+  L=L||{}; R=R||{}; S=S||{};
+  var out={}, keys={}, f;
+  for(f in L) keys[f]=1; for(f in R) keys[f]=1;
+  for(f in keys){
+    var v = (jstr(L[f])!==jstr(S[f])) ? L[f] : R[f];
+    if(v!==undefined) out[f]=v;
+  }
+  return out;
+}
+function mergeEntry(L,R,S){
+  L=L||{}; R=R||{}; S=S||{};
+  var out={}, keys={}, p;
+  for(p in L) keys[p]=1; for(p in R) keys[p]=1;
+  for(p in keys){
+    var l=L[p], r=R[p], s=S[p], v;
+    if(Array.isArray(l)||Array.isArray(r)) v=mergeArr(Array.isArray(l)?l:[],Array.isArray(r)?r:[],Array.isArray(s)?s:[]);
+    else if(isObj(l)||isObj(r)) v=mergeObj(isObj(l)?l:{},isObj(r)?r:{},isObj(s)?s:{});
+    else v=(jstr(l)!==jstr(s))?l:r;
+    if(v!==undefined) out[p]=v;
+  }
+  return out;
+}
+// Lista de empleados creados en el portal: SIEMPRE union por DNI, nunca se quita nadie
+function unionExtras(a,b){
+  var seen={}, out=[];
+  (a||[]).concat(b||[]).forEach(function(e){
+    if(!e || !e.dni) return;
+    var k=normDni(e.dni);
+    if(seen[k]) return;
+    seen[k]=1; out.push(e);
+  });
+  return out;
+}
+function mergeExtraEntry(L,R,S){
+  var Lc={}, Rc={}, Sc={}, p;
+  for(p in (L||{})) if(p!=='extra_emps') Lc[p]=L[p];
+  for(p in (R||{})) if(p!=='extra_emps') Rc[p]=R[p];
+  for(p in (S||{})) if(p!=='extra_emps') Sc[p]=S[p];
+  var out=mergeEntry(Lc,Rc,Sc);
+  out.extra_emps=unionExtras((R&&R.extra_emps)||[], (L&&L.extra_emps)||[]);
+  return out;
+}
+function mergeConfigEntry(L,R,S){
+  var out=mergeEntry(L||{},R||{},S||{});
+  var dl=(L&&L.edits&&L.edits.despachos)||[], dr=(R&&R.edits&&R.edits.despachos)||[];
+  if(dl.length||dr.length){
+    var seen={}, u=[];
+    dr.concat(dl).forEach(function(d){ if(!seen[d]){ seen[d]=1; u.push(d); } });
+    u.sort();
+    if(!out.edits) out.edits={};
+    out.edits.despachos=u;
+  }
+  return out;
+}
+// Fusion del estado completo: local (este navegador) + remoto (Supabase) + base (ultimo remoto visto)
+function merge3(local,remote,snap){
+  var out={}, keys={}, k;
+  for(k in local) keys[k]=1; for(k in remote) keys[k]=1;
+  for(k in keys){
+    var L=local[k], R=remote[k], S=snap[k];
+    var base=null;
+    if(S!==undefined){ try{ base=JSON.parse(S); }catch(x){ base=null; } }
+    if(k==='_meta'){ if(R!==undefined) out[k]=R; continue; }
+    if(k==='_extra'){ out[k]=mergeExtraEntry(L,R,base); continue; }
+    if(k==='_config'){ out[k]=mergeConfigEntry(L,R,base); continue; }
+    if(L===undefined){
+      // borrada aqui a proposito (cambio de DNI) y sin cambios en el otro lado -> se elimina
+      if(S!==undefined && JSON.stringify(R)===S) continue;
+      out[k]=R; continue;
+    }
+    if(R===undefined){
+      if(isEmptyEntry(L)) continue;
+      out[k]=L; continue;
+    }
+    var lj=JSON.stringify(L), rj=JSON.stringify(R);
+    if(lj===rj){ out[k]=R; continue; }
+    if(S===undefined){ out[k]=isEmptyEntry(L)?R:mergeEntry(L,R,{}); continue; }
+    if(lj===S){ out[k]=R; continue; }
+    if(rj===S){ out[k]=L; continue; }
+    out[k]=mergeEntry(L,R,base||{});
+  }
+  return out;
+}
+// Aplica un estado fusionado a ST sin sustituir lo que no ha cambiado
+function applyState(merged){
+  for(var k in merged){
+    if(ST[k]===undefined || JSON.stringify(ST[k])!==JSON.stringify(merged[k])) ST[k]=merged[k];
+  }
+}
+// Primera lectura de Supabase en la sesion
+function firstSync(remote){
+  if(_dirty){
+    // quedaron cambios sin guardar: se fusionan con lo remoto
+    applyState(merge3(ST, remote, {}));
+  } else {
+    // Supabase manda; solo se conserva lo que aqui existe y alli no, y la lista de empleados (union)
+    var merged={}, k;
+    for(k in remote){
+      if(k==='_extra') merged[k]=mergeExtraEntry(ST[k],remote[k],null);
+      else if(k==='_config') merged[k]=mergeConfigEntry(ST[k],remote[k],null);
+      else merged[k]=remote[k];
+    }
+    for(k in ST){ if(merged[k]===undefined && !isEmptyEntry(ST[k])) merged[k]=ST[k]; }
+    ST=merged;
+  }
+  _snap=snapshotOf(remote);
+  _remoteLoaded=true;
+}
+// Hay algo en este navegador que Supabase no tiene?
+function needsPush(){
+  for(var k in ST){
+    if(k==='_meta') continue;
+    if(_snap[k]===undefined){ if(!isEmptyEntry(ST[k])) return true; continue; }
+    if(JSON.stringify(ST[k])!==_snap[k]) return true;
+  }
+  for(var j in _snap){ if(j!=='_meta' && ST[j]===undefined) return true; }
+  return false;
+}
+// Pasa a pantalla los empleados creados en el portal (los propios y los del otro ordenador)
+function syncExtra(){
+  if(!ST['_extra']) return false;
+  if(!ST['_extra'].extra_emps) ST['_extra'].extra_emps=[];
+  var list=ST['_extra'].extra_emps, added=false;
+  var inBase={}, inExtra={}, inList={};
+  EMPS_BASE.forEach(function(b){ inBase[normDni(b.dni)]=1; });
+  EXTRA_EMPS.forEach(function(e){ inExtra[normDni(e.dni)]=1; });
+  var alias={};
+  for(var sk in ST){
+    var se=ST[sk]&&ST[sk].edits;
+    if(se && se.dni_anterior) alias[normDni(se.dni_anterior)]=normDni(sk);
+  }
+  list.forEach(function(e){
+    if(!e || !e.dni) return;
+    var k=normDni(e.dni); inList[k]=1;
+    if(inBase[k]) return;
+    if(alias[k] && inBase[alias[k]]) return; // ya esta en pantalla con su DNI corregido
+    var copy=JSON.parse(JSON.stringify(e));
+    EMPS_BASE.push(copy); inBase[k]=1; added=true;
+    if(!inExtra[k]){ EXTRA_EMPS.push(copy); inExtra[k]=1; }
+  });
+  return added;
+}
+// Un cambio de DNI se guarda como alias para que sobreviva a recargar la pagina
+function applyDniAliases(){
+  for(var k in ST){
+    var e=ST[k]&&ST[k].edits;
+    if(!e || !e.dni_anterior || e.dni_anterior===k) continue;
+    if(getEmp(k)) continue;
+    var emp=getEmp(e.dni_anterior);
+    if(emp) emp.dni=k;
+  }
+}
+function setPending(on){
+  _dirty=!!on;
+  try{ if(on) localStorage.setItem(LSK_PEND,'1'); else localStorage.removeItem(LSK_PEND); }catch(x){}
+}
+function fetchRemote(cb){
+  sbFetch(SB_URL+'/rest/v1/'+SB_TABLE+'?id=eq.1&select=contenido', {
+    method: 'GET'
+  }).then(function(r){
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    return r.json();
+  }).then(function(data){
+    if(!Array.isArray(data)) throw new Error('respuesta inesperada');
+    var remote={};
+    if(data[0] && data[0].contenido){
+      remote=JSON.parse(data[0].contenido);
+      if(!remote || typeof remote!=='object' || Array.isArray(remote)) throw new Error('contenido inesperado');
+    }
+    cb(null, remote, data.length>0);
+  }).catch(function(e){ console.error('Sync error:',e); cb(e||new Error('error')); });
+}
+
+var REV_TAG = 'DARRHHREVTAG';
+function newRev(){
+  return 'rv'+Date.now().toString(36)+Math.random().toString(36).replace(/[^a-z0-9]/g,'').substring(0,12);
+}
+function saveAll(){
+  if(!_appStarted) return;
+  try{ localStorage.setItem(LSK, JSON.stringify(ST)); }catch(x){}
+  setPending(true);
+  if(_saving){ _saveAgain=true; return; }
+  _saving=true; _saveSeq++;
+  setSyncStatus('loading','Guardando...');
+  function done(ok,msg){
+    _saving=false;
+    if(ok){
+      if(_saveAgain){ _saveAgain=false; saveAll(); return; }
+      setPending(false);
+      setSyncStatus('ok','Guardado ✓');
+      setTimeout(function(){ if(!_saving) setSyncStatus('ok',''); },2000);
+    } else {
+      _saveAgain=false;
+      setSyncStatus('err',msg);
+    }
+  }
+  // 1. Leer lo que hay ahora en Supabase  2. Fusionar  3. Escribir (solo si nadie ha escrito entre medias)
+  function attempt(n){
+    fetchRemote(function(err, remote, rowExists){
+      if(err){ done(false,'Sin conexion - cambios pendientes'); return; }
+      var merged;
+      if(!_remoteLoaded){ merged=merge3(ST, remote, {}); _remoteLoaded=true; }
+      else merged=merge3(ST, remote, _snap);
+      var oldRev=(remote['_meta']&&remote['_meta'].rev)||'';
+      if(!/^rv[a-z0-9]+$/.test(oldRev)) oldRev='';
+      merged['_meta']={rev:newRev(), tag:REV_TAG, ts:new Date().toISOString(), v:PORTAL_VERSION};
+      applyState(merged);
+      // lo remoto ya esta incorporado a ST: pasa a ser la referencia aunque la escritura falle
+      _snap=snapshotOf(remote);
+      var newSnap=snapshotOf(merged);
+      var listChanged=syncExtra(); applyDniAliases(); loadDespachos();
+      try{ localStorage.setItem(LSK, JSON.stringify(ST)); }catch(x){}
+      if(listChanged){ renderList(); updStats(); buildAlerts(); }
+      var body=JSON.stringify({id:1, contenido: JSON.stringify(merged)});
+      var cond = rowExists && _useCas && n<4;
+      // condicion: el contenido sigue siendo el que se acaba de leer
+      //  - con marca de revision: debe seguir teniendo ESA marca
+      //  - sin marca (primer guardado con esta version): debe seguir sin ninguna
+      var filtro = oldRev ? '&contenido=like.*'+oldRev+'*' : '&contenido=not.like.*'+REV_TAG+'*';
+      var url=SB_URL+'/rest/v1/'+SB_TABLE;
+      if(rowExists) url+='?id=eq.1'+(cond?filtro:'')+'&select=id';
+      var hdr={'Content-Type':'application/json','Prefer': rowExists?'return=representation':'return=minimal'};
+      sbFetch(url, { method: rowExists?'PATCH':'POST', headers: hdr, body: body })
+      .then(function(r){
+        if(!r.ok){
+          if(cond){ _useCas=false; attempt(n+1); return null; }
+          done(false,'Error al guardar - cambios pendientes'); return null;
+        }
+        if(!rowExists) return 'written';
+        return r.text().then(function(t){
+          var rows=null; try{ rows=JSON.parse(t); }catch(x){}
+          if(cond && Array.isArray(rows) && rows.length===0) return 'conflict';
+          return 'written';
+        });
+      }).then(function(res){
+        if(res==='written'){ _snap=newSnap; done(true); }
+        else if(res==='conflict'){
+          // otro ordenador ha guardado justo entre medias: se vuelve a leer y a fusionar
+          setTimeout(function(){ attempt(n+1); }, 60+Math.floor(Math.random()*240));
+        }
+      }).catch(function(){ done(false,'Sin conexion - cambios pendientes'); });
+    });
+  }
+  attempt(0);
+}
+
+function loadFromSupabase(cb){
+  setSyncStatus('loading','Cargando...');
+  fetchRemote(function(err, remote){
+    if(err){
+      setSyncStatus('err','Sin conexion (local)');
+      if(cb) cb();
+      return;
+    }
+    firstSync(remote);
+    try{ localStorage.setItem(LSK, JSON.stringify(ST)); }catch(x){}
+    setSyncStatus('ok','Sincronizado');
+    if(cb) cb();
+  });
+}
+
+function setSyncStatus(type,msg){
+  var dot=document.getElementById('SDOT');
+  var lbl=document.getElementById('SLBL');
+  if(dot) dot.className='sync-dot '+type;
+  if(lbl) lbl.innerHTML=msg||'';
+}
+
+function pollRemote(){
+  if(_saving || !_sess || !_appStarted) return;
+  var seq=_saveSeq;
+  fetchRemote(function(err, remote){
+    if(err) return;
+    // si mientras tanto se ha guardado algo, esta lectura ya es vieja: se descarta
+    if(_saving || seq!==_saveSeq) return;
+    if(!_remoteLoaded){
+      firstSync(remote);
+      mergePreloaded(true);
+    } else {
+      applyState(merge3(ST, remote, _snap));
+      _snap=snapshotOf(remote);
+    }
+    syncExtra(); applyDniAliases(); loadDespachos();
+    try{ localStorage.setItem(LSK,JSON.stringify(ST)); }catch(x){}
+    // Don't auto-refresh detail view - user controls navigation
+    renderList(); updStats(); buildAlerts();
+    if(needsPush()){ saveAll(); return; }
+    if(_dirty) setPending(false);
+    if(!_dirty){
+      setSyncStatus('ok','Sincronizado ↻');
+      setTimeout(function(){ if(!_saving) setSyncStatus('ok','Sincronizado'); },2000);
+    }
+  });
+}
+function startAutoSync(){
+  if(_syncInterval) clearInterval(_syncInterval);
+  _syncInterval = setInterval(pollRemote, 15000);
+}
+function showSaved(msg){ var el=document.getElementById('SLBL'); el.innerHTML=msg; setTimeout(function(){el.innerHTML='';},2500); }
+function ges(d){ if(!ST[d]) ST[d]={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''}; return ST[d]; }
+function getEmp(dni){ for(var i=0;i<EMPS_BASE.length;i++) if(EMPS_BASE[i].dni===dni) return EMPS_BASE[i]; return null; }
+function getField(emp,es2,f){
+  if(es2.edits&&es2.edits[f]!==undefined) return es2.edits[f];
+  return emp[f]||'';
+}
+
+// ============================================================
+// HELPERS
+// ============================================================
+var CLS=['#C8102E','#388bfd','#bc8cff','#3fb950','#d29922','#f85149','#1abc9c','#e67e22'];
+function col(n){var h=0;for(var i=0;i<n.length;i++)h+=n.charCodeAt(i);return CLS[h%CLS.length];}
+function ini(n){var p=n.replace(/,.*/,'').trim().split(' ');return((p[0]||'')[0]+((p[1]||'')[0]||'')).toUpperCase();}
+function fd(d){if(!d||d==='None'||d.length<8)return '-';var p=d.substring(0,10).split('-');return p.length<3?d:p[2]+'/'+p[1]+'/'+p[0];}
+function fiso(d){if(!d||d==='None'||d.length<8)return '';return d.substring(0,10);}
+function alDoc(c){
+  if(!c||c==='None'||c.length<8)return{k:'as',t:'Sin fecha'};
+  var df=(new Date(c.substring(0,10))-new Date())/86400000;
+  if(df<0)return{k:'av2',t:'VENCIDO'};if(df<=90)return{k:'ap',t:'Vence pronto'};
+  return{k:'ao',t:'Vigente'};
+}
+function sA(s){
+  return s.indexOf('ASCENT')>=0?'Ascent':s.indexOf('BOWIE')>=0?'Bowie':
+    (s.indexOf('EDUCAR')>=0||s.indexOf('FORMACION')>=0)?'Educar':
+    s.indexOf('DESKO')>=0?'Desko':s.indexOf('QUANTUM')>=0?'Quantum':s.substring(0,10);
+}
+function isEducar(s){ return s.indexOf('EDUCAR')>=0||s.indexOf('FORMACION')>=0; }
+// Compound filter: cF can be "ASCENT+ACT" etc
+var cF2 = ''; // secondary filter (estado)
+
+function mF(e){
+  var est=getEstado(e);
+  // Check primary filter
+  var socOk = true;
+  var estOk = true;
+  if(cF==='ALL') { socOk=true; estOk=cF2===''?true:(cF2==='ACT'?est==='ACTIVO':cF2==='BAJ'?est==='BAJA':cF2==='IT'?est==='IT':true); return socOk&&estOk; }
+  else if(cF==='ACT') { socOk=true; estOk=est==='ACTIVO'; }
+  else if(cF==='BAJ') { socOk=true; estOk=est==='BAJA'; }
+  else if(cF==='IT') { socOk=true; estOk=est==='IT'; }
+  else if(cF==='PP') {
+    socOk=true;
+    var hoyPP=new Date(); var hoyIsoP=hoyPP.toISOString().substring(0,10);
+    var en30P=new Date(hoyPP); en30P.setDate(en30P.getDate()+30); var en30IsoP=en30P.toISOString().substring(0,10);
+    var pp=getField(e,ges(e.dni),'periodo_prueba_fin');
+    estOk=est==='ACTIVO'&&pp&&pp!=='-'&&pp!=='ANULADA'&&pp.length>4&&pp>=hoyIsoP&&pp<=en30IsoP;
+    return socOk&&estOk;
+  }
+  else if(cF==='DV') {
+    if(getEstado(e)==='BAJA') return false;
+    var alDV=alDoc(getField(e,ges(e.dni),'caducidad_doc')||e.caducidad_doc);
+    return alDV.k==='av2';
+  }
+  else if(cF==='DP') {
+    if(getEstado(e)==='BAJA') return false;
+    var alDP=alDoc(getField(e,ges(e.dni),'caducidad_doc')||e.caducidad_doc);
+    return alDP.k==='ap';
+  }
+  else if(cF==='VM') {
+    var hoyVM=new Date();
+    var mesIniVM=new Date(hoyVM.getFullYear(),hoyVM.getMonth(),1).toISOString().substring(0,10);
+    var mesFinVM=new Date(hoyVM.getFullYear(),hoyVM.getMonth()+1,0).toISOString().substring(0,10);
+    return (ges(e.dni).records||[]).some(function(r){
+      return r.tipo==='vacaciones'&&r.f1&&r.f2&&r.f1<=mesFinVM&&r.f2>=mesIniVM&&(r.estado==='aprobado'||r.estado==='disfrutado');
+    });
+  }
+  else if(cF==='DA') {
+    return (ges(e.dni).disciplinario||[]).some(function(d){return d.estado==='abierto';});
+  }
+  else if(cF==='ASCENT') { socOk=e.sociedad.indexOf('ASCENT')>=0; }
+  else if(cF==='BOWIE') { socOk=e.sociedad.indexOf('BOWIE')>=0; }
+  else if(cF==='EDUCAR') { socOk=e.sociedad.indexOf('EDUCAR')>=0||e.sociedad.indexOf('FORMACION')>=0; }
+  else if(cF==='DESKO') { socOk=e.sociedad.indexOf('DESKO')>=0; }
+  else if(cF==='QUANTUM') { socOk=e.sociedad.indexOf('QUANTUM')>=0; }
+  // Secondary filter (estado)
+  if(cF2==='ACT') estOk=estOk&&est==='ACTIVO';
+  else if(cF2==='BAJ') estOk=estOk&&est==='BAJA';
+  else if(cF2==='IT') estOk=estOk&&est==='IT';
+  return socOk && estOk;
+}
+function getEstado(e){
+  var es2=ges(e.dni);
+  // Explicit estado edit always wins
+  if(es2.edits&&es2.edits.estado) return es2.edits.estado;
+  var bajaEdited = es2.edits&&es2.edits.hasOwnProperty('baja');
+  var baja = bajaEdited ? es2.edits.baja : (e.baja||'');
+  if(!baja||baja==='-'||baja==='ANULADA'||baja==='') {
+    // Check active IT records
+    var hoyIso = new Date().toISOString().substring(0,10);
+    var IT_TIPOS = ['it-comun','it-accidente-lab','it-accidente-itin','maternidad'];
+    var hasIT = (es2.records||[]).some(function(r){
+      if(IT_TIPOS.indexOf(r.tipo)<0 || !r.f1) return false;
+      // Active IT: started on or before today AND (no end date OR end date >= today)
+      var started = r.f1 <= hoyIso;
+      var notEnded = !r.f2 || r.f2 === '' || r.f2 >= hoyIso;
+      return started && notEnded;
+    });
+    if(hasIT) return 'IT';
+    return e.estado||'ACTIVO';
+  }
+  if(baja.length>4) return 'BAJA';
+  return e.estado||'ACTIVO';
+}
+function badgeCls(est){
+  var m={ACTIVO:'b-act',BAJA:'b-baj',IT:'b-it',EXCEDENCIA:'b-exc','MATERNIDAD/PATERNIDAD':'b-mat',SUSPENSION:'b-exc'};
+  return m[est]||'b-act';
+}
+function semaforo(e){
+  var al=alDoc(getField(e,ges(e.dni),'caducidad_doc'));
+  var recs=ges(e.dni).records||[];
+  var disc=ges(e.dni).disciplinario||[];
+  if(al.k==='av2'||disc.filter(function(d){return d.estado==='abierto';}).length>0) return 'sem-r';
+  if(al.k==='ap'||recs.filter(function(r){return r.estado==='solicitado';}).length>0) return 'sem-y';
+  return 'sem-g';
+}
+
+// ============================================================
+// VACACIONES CALC
+// ============================================================
+// Festivos Madrid 2026
+var FESTIVOS = {
+  2026: [
+    '2026-01-01','2026-01-06','2026-04-02','2026-04-03',
+    '2026-05-01','2026-05-02','2026-05-15',
+    '2026-08-15','2026-10-12','2026-11-02','2026-11-09',
+    '2026-12-07','2026-12-08','2026-12-25'
+  ],
+  2027: [
+    '2027-01-01','2027-01-06','2027-03-26','2027-04-02',
+    '2027-05-03','2027-08-16','2027-10-12','2027-11-01',
+    '2027-12-06','2027-12-08','2027-12-25',
+    '2027-05-02','2027-05-15','2027-11-09'
+  ]
+};
+
+function esFestivo(fecha){
+  var y = fecha.getFullYear();
+  var mo = String(fecha.getMonth()+1).padStart(2,'0');
+  var d = String(fecha.getDate()).padStart(2,'0');
+  var iso = y+'-'+mo+'-'+d;
+  var list = FESTIVOS[y] || FESTIVOS[2026];
+  return list.indexOf(iso) >= 0;
+}
+
+function parseFecha(s){var p=s.split('-');return new Date(parseInt(p[0]),parseInt(p[1])-1,parseInt(p[2]));}
+function diasLaborables(f1, f2){
+  var count = 0;
+  var cur = parseFecha(f1);
+  var end = parseFecha(f2);
+  while(cur <= end){
+    var dow = cur.getDay();
+    if(dow !== 0 && dow !== 6 && !esFestivo(cur)) count++;
+    cur.setDate(cur.getDate()+1);
+  }
+  return count;
+}
+
+function diasNaturales(f1, f2){
+  var d1=parseFecha(f1); var d2=parseFecha(f2);
+  return Math.round((d2-d1)/86400000)+1;
+}
+
+function calcVacaciones(emp,ano){
+  var es2=ges(emp.dni);
+  var inicio=fiso(getField(emp,es2,'inicio'));
+  var baja=fiso(getField(emp,es2,'baja')||emp.baja);
+  var soc=getField(emp,es2,'sociedad')||emp.sociedad;
+  var educar=isEducar(soc);
+  var diasAno=educar?30:23;
+  var hoy=new Date(); var anoActual=ano||hoy.getFullYear();
+  var fIni=inicio?new Date(inicio):null;
+  var fBaj=baja&&baja.length>4?new Date(baja):null;
+  var iniAno=new Date(anoActual,0,1);
+  var finAno=new Date(anoActual,11,31);
+  var desde=fIni&&fIni>iniAno?fIni:iniAno;
+  var hasta=fBaj&&fBaj<finAno?fBaj:finAno;
+  // Pro-rate days based on time worked in year
+  var diasTrabajados=hasta>desde?Math.round((hasta-desde)/86400000):0;
+  var dias=hasta>desde?Math.round(diasAno*diasTrabajados/365):0;
+
+  // Calculate used days - use ano_devengo if set, otherwise use f1 year
+  var recs=(es2.records||[]).filter(function(r){
+    if(r.tipo!=='vacaciones') return false;
+    var anoRec = r.ano_devengo ? parseInt(r.ano_devengo) : parseInt((r.f1||'').substring(0,4));
+    return anoRec===anoActual;
+  });
+  var disfrutadas=0;
+  recs.forEach(function(r){
+    if(r.estado==='disfrutado'||r.estado==='aprobado'){
+      var d;
+      if(r.f1&&r.f2){
+        d = educar ? diasNaturales(r.f1,r.f2) : diasLaborables(r.f1,r.f2);
+      } else {
+        d = parseFloat(r.dias||0);
+      }
+      disfrutadas += d;
+    }
+  });
+  var pendientes=Math.max(0,dias-disfrutadas);
+  var solicitadas=recs.filter(function(r){return r.estado==='solicitado';}).length;
+  return{generadas:dias,disfrutadas:Math.round(disfrutadas*10)/10,
+    pendientes:Math.round(pendientes*10)/10,solicitadas:solicitadas,
+    tipo:educar?'naturales':'laborables',diasAno:diasAno};
+}
+
+// ============================================================
+// SIDEBAR
+// ============================================================
+function setF(b){
+  var newF = b.getAttribute('data-f');
+  var socFilters=['ASCENT','BOWIE','EDUCAR','DESKO','QUANTUM'];
+  var estFilters=['ACT','BAJ','IT'];
+
+  if(newF==='ALL'){
+    // Reset everything
+    cF='ALL'; cF2='';
+  } else if(socFilters.indexOf(newF)>=0){
+    // Clicking a society - set as primary, keep estado secondary
+    cF=newF;
+    // cF2 stays unchanged so Activos/Bajas/IT secondary filter persists
+  } else if(estFilters.indexOf(newF)>=0){
+    // Clicking an estado filter
+    if(socFilters.indexOf(cF)>=0){
+      // Society already active - set estado as secondary
+      cF2=newF;
+    } else {
+      // No society active - set estado as primary
+      cF=newF; cF2='';
+    }
+  }
+
+  // Update button visuals - highlight both active filters
+  document.querySelectorAll('.fb').forEach(function(x){x.classList.remove('on');});
+  document.querySelectorAll('.fb').forEach(function(x){
+    var f=x.getAttribute('data-f');
+    if(f===cF || (cF2&&f===cF2)) x.classList.add('on');
+  });
+
+  renderList();
+}
+function setFbyName(f){
+  cF=f; cF2='';
+  document.querySelectorAll('.fb').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-f')===f);});
+  renderList();
+}
+
+function renderList(){
+  var q=document.getElementById('SRCH').value.toLowerCase().trim();
+  var list=EMPS_BASE.filter(function(e){
+    if(!mF(e))return false;
+    if(!q)return true;
+    return e.nombre.toLowerCase().indexOf(q)>=0||e.dni.toLowerCase().indexOf(q)>=0||
+      e.archivo.toLowerCase().indexOf(q)>=0||
+      (e.puesto||'').toLowerCase().indexOf(q)>=0||
+      (e.despacho||'').toLowerCase().indexOf(q)>=0;
+  });
+  var el=document.getElementById('EL'); el.innerHTML='';
+  list.forEach(function(e){
+    var div=document.createElement('div');
+    div.className='ei'+(cDni===e.dni?' on':'');
+    var c=col(e.nombre),est=getEstado(e),sem=semaforo(e);
+    var av=document.createElement('div'); av.className='av';
+    av.style.background=c+'20'; av.style.color=c; av.textContent=ini(e.nombre);
+    var info=document.createElement('div'); info.style.cssText='flex:1;min-width:0';
+    var nm=document.createElement('div'); nm.className='en';
+    var semSpan=document.createElement('span'); semSpan.className='sem '+sem;
+    nm.appendChild(semSpan);
+    var es2l=ges(e.dni);
+    var nombreDisplay = getField(e,es2l,'nombre')||e.nombre;
+    nm.appendChild(document.createTextNode(nombreDisplay));
+    var sb=document.createElement('div'); sb.className='esb';
+    var despDisplay = getField(e,es2l,'despacho')||e.despacho||'-';
+    var socDisplay = getField(e,es2l,'sociedad')||e.sociedad||'';
+    sb.textContent=sA(socDisplay)+' - '+despDisplay;
+    info.appendChild(nm); info.appendChild(sb);
+    var bd=document.createElement('span'); bd.className='badge '+badgeCls(est); bd.textContent=est.substring(0,4);
+    div.appendChild(av); div.appendChild(info); div.appendChild(bd);
+    div.addEventListener('click',(function(d){return function(){selEmp(d);};})(e.dni));
+    el.appendChild(div);
+  });
+  updStats();
+}
+
+function updStats(){
+  var a=0,b=0,it=0;
+  EMPS_BASE.forEach(function(e){
+    var est=getEstado(e);
+    if(est==='ACTIVO')a++;else if(est==='BAJA')b++;else if(est==='IT')it++;
+  });
+  document.getElementById('N1').textContent=EMPS_BASE.length;
+  document.getElementById('N2').textContent=a;
+  document.getElementById('N3').textContent=b;
+  document.getElementById('N4').textContent=it;
+}
+
+// ============================================================
+// ALERTS BAR
+// ============================================================
+function buildAlerts(){
+  var vencidos=0,pronto=0,vacPend=0,vacMes=0,disc_abiertos=0,it_open=0,prueba_pronto=0;
+  var hoy=new Date(); var hoyIso=hoy.toISOString().substring(0,10);
+  var en30=new Date(hoy); en30.setDate(en30.getDate()+30); var en30Iso=en30.toISOString().substring(0,10);
+  EMPS_BASE.forEach(function(e){
+    var es2=ges(e.dni);
+    var al=alDoc(getField(e,es2,'caducidad_doc')||e.caducidad_doc);
+    if(al.k==='av2')vencidos++;else if(al.k==='ap')pronto++;
+    var v=calcVacaciones(e); if(v.pendientes>5)vacPend++;
+    // Check if employee is on vacation this month
+    var mesIni=new Date(hoy.getFullYear(),hoy.getMonth(),1).toISOString().substring(0,10);
+    var mesFin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0).toISOString().substring(0,10);
+    var enVacMes=(ges(e.dni).records||[]).some(function(r){
+      return r.tipo==='vacaciones'&&r.f1&&r.f2&&r.f1<=mesFin&&r.f2>=mesIni&&(r.estado==='aprobado'||r.estado==='disfrutado');
+    });
+    if(enVacMes) vacMes++;
+    (es2.disciplinario||[]).forEach(function(d){if(d.estado==='abierto')disc_abiertos++;});
+    (es2.records||[]).forEach(function(r){if(r.tipo&&r.tipo.indexOf('it-')===0&&(!r.f2||r.f2>=hoyIso))it_open++;});
+    // Periodo de prueba ending in next 30 days
+    var pp=getField(e,es2,'periodo_prueba_fin');
+    if(pp&&pp!=='-'&&pp!=='ANULADA'&&pp.length>4&&pp>=hoyIso&&pp<=en30Iso) prueba_pronto++;
+  });
+  // Render alert bar above sidebar list if any alerts
+  var bar=document.querySelector('.alert-bar');
+  if(!bar){bar=document.createElement('div');bar.className='alert-bar';document.querySelector('.sidebar').insertBefore(bar,document.getElementById('EL'));}
+  bar.innerHTML='';
+  function addChip(txt,cls,extraFilter){
+    var ch=document.createElement('div');ch.className='alert-chip '+cls;ch.innerHTML=txt;
+        ch.onclick=function(){
+      var socFilters=['ASCENT','BOWIE','EDUCAR','DESKO','QUANTUM'];
+      var estFilters=['ACT','BAJ','IT','PP','DV','DP','VM','DA'];
+      if(estFilters.indexOf(extraFilter)>=0){
+        if(socFilters.indexOf(cF)>=0){
+          cF2=extraFilter;
+        } else {
+          cF=extraFilter; cF2='';
+        }
+      } else if(extraFilter==='ALL'){
+        cF='ALL'; cF2='';
+      } else {
+        cF=extraFilter; cF2='';
+      }
+      document.querySelectorAll('.fb').forEach(function(x){
+        var f=x.getAttribute('data-f');
+        x.classList.toggle('on', f===cF||(cF2&&f===cF2));
+      });
+      renderList();
+    };
+    bar.appendChild(ch);
+  }
+  if(vencidos>0) addChip('&#128308; '+vencidos+' docs vencidos','danger','DV');
+  if(pronto>0) addChip('&#128992; '+pronto+' docs pronto','warn','DP');
+
+  if(it_open>0) addChip('&#127979; '+it_open+' IT abiertas','warn','IT');
+  if(vacPend>0) addChip('&#127958; '+vacMes+' vac. este mes','warn','VM');
+  if(prueba_pronto>0) addChip('&#9201; '+prueba_pronto+' fin periodo prueba','warn','PP');
+  if(bar.children.length===0) bar.style.display='none'; else bar.style.display='flex';
+}
+
+// ============================================================
+// SELECT EMPLOYEE
+// ============================================================
+function selEmpByArchivo(archivo) {
+  var found = null;
+  for(var i=0; i<EMPS_BASE.length; i++) {
+    if(EMPS_BASE[i].archivo === archivo) { found = EMPS_BASE[i]; break; }
+  }
+  if(found) selEmp(found.dni, found.archivo);
+}
+
+function selEmp(dni, archivo){
+  // Support disambiguation by archivo when same DNI has multiple entries
+  cDni=dni; cTab='datos'; renderList();
+  var emp = null;
+  if(archivo) {
+    for(var i=0;i<EMPS_BASE.length;i++) {
+      if(EMPS_BASE[i].dni===dni && EMPS_BASE[i].archivo===archivo) { emp=EMPS_BASE[i]; break; }
+    }
+  }
+  if(!emp) emp=getEmp(dni);
+  if(!emp)return;
+  renderDetail(emp);
+}
+
+function renderDetail(emp){
+  var det=document.getElementById('DET'); det.innerHTML='';
+  var es2=ges(emp.dni);
+  var _n0=getField(emp,es2,'nombre')||emp.nombre; var c=col(_n0), al=alDoc(getField(emp,es2,'caducidad_doc'));
+  var est=getEstado(emp);
+
+  // PROFILE HEADER
+  var ph=document.createElement('div'); ph.className='ph';
+  var pa=document.createElement('div'); pa.className='pa';
+  pa.style.background=c+'25'; pa.style.color=c; var _nombre=getField(emp,es2,'nombre')||emp.nombre; pa.textContent=ini(_nombre);
+  var pi=document.createElement('div'); pi.style.flex='1';
+  var pn=document.createElement('div'); pn.className='pname'; pn.textContent=getField(emp,es2,'nombre')||emp.nombre;
+  var pm=document.createElement('div'); pm.className='pmeta';
+  pm.textContent=(getField(emp,es2,'puesto')||'-')+' · '+(getField(emp,es2,'despacho')||'-')+' · '+sA(getField(emp,es2,'sociedad')||emp.sociedad);
+  var pb=document.createElement('div'); pb.className='pbadges';
+  var b1=document.createElement('span'); b1.className='badge '+badgeCls(est); b1.textContent=est;
+  var b2=document.createElement('span'); b2.className='badge'; b2.style.cssText='background:rgba(255,255,255,.07);color:var(--mu)';
+  b2.textContent='Nº '+emp.archivo;
+  var b3=document.createElement('span'); b3.className='pac-v '+al.k; b3.textContent=al.t;
+  var sem=document.createElement('span'); sem.className='sem '+semaforo(emp);
+  pb.appendChild(sem); pb.appendChild(b1); pb.appendChild(b2); pb.appendChild(b3);
+  pi.appendChild(pn); pi.appendChild(pm); pi.appendChild(pb);
+  var pac=document.createElement('div'); pac.className='pactions';
+  var pbtns=[
+    ['+ Registro','btn-r',function(){openModal('MR');}],
+    ['+ Disciplinario','btn-o',function(){openModal('MD');}],
+    ['+ Nota','btn-o',function(){openModal('MN');}],
+    ['+ Nuevo contrato','btn-bl',function(){openNuevoContrato();}],
+  ];
+  pbtns.forEach(function(b){
+    var btn=document.createElement('button'); btn.className='btn '+b[1]+' btn-sm'; btn.textContent=b[0];
+    btn.onclick=b[2]; pac.appendChild(btn);
+  });
+  ph.appendChild(pa); ph.appendChild(pi); ph.appendChild(pac);
+  det.appendChild(ph);
+
+  // Related contracts banner (same DNI in other societies)
+  var currentSoc = getField(emp, es2, 'sociedad') || emp.sociedad || '';
+  var related = [];
+  EMPS_BASE.forEach(function(e) {
+    if(e.dni === emp.dni && e.archivo !== emp.archivo) {
+      related.push(e);
+    }
+  });
+
+    if(related.length > 0) {
+    var est = getEstado(emp);
+    related.forEach(function(rel) {
+      var relEst = getEstado(rel);
+      var relInicio = getField(rel, ges(rel.dni), 'inicio') || rel.inicio || '';
+      var relBaja = getField(rel, ges(rel.dni), 'baja') || rel.baja || '';
+      var relSoc = getField(rel, ges(rel.dni), 'sociedad') || rel.sociedad || '';
+      var relArch = rel.archivo;
+
+      var banner = document.createElement('div');
+      var icon = document.createElement('span'); icon.className='cl-icon';
+      var text = document.createElement('span'); text.className='cl-text';
+      var btn = document.createElement('span'); btn.className='cl-badge';
+      btn.style.cursor='pointer';
+
+      if(est === 'BAJA' && relEst === 'ACTIVO') {
+        banner.className = 'contract-link-banner';
+        icon.textContent = String.fromCodePoint(128279);
+        text.innerHTML = 'Continuó en <strong>' + socShort(relSoc) + '</strong> desde ' + fd(relInicio) + ' · N° ' + relArch;
+        btn.textContent = 'Ver ficha activa →';
+        btn.onclick = (function(a){ return function(){ selEmpByArchivo(a); }; })(relArch);
+      } else if(est === 'ACTIVO' && relEst === 'BAJA') {
+        banner.className = 'contract-prev-banner';
+        icon.textContent = String.fromCodePoint(128336);
+        text.innerHTML = 'Contrato anterior en <strong>' + socShort(relSoc) + '</strong> · ' + fd(relInicio) + (relBaja&&relBaja!=='-'&&relBaja!=='ANULADA' ? ' - ' + fd(relBaja) : '') + ' · N° ' + relArch;
+        btn.textContent = 'Ver ficha anterior ↗';
+        btn.onclick = (function(a){ return function(){ selEmpByArchivo(a); }; })(relArch);
+      } else {
+        banner.className = 'contract-link-banner';
+        icon.textContent = String.fromCodePoint(128279);
+        text.innerHTML = 'También en <strong>' + socShort(relSoc) + '</strong> · N° ' + relArch + ' · ' + relEst;
+        btn.textContent = 'Ver ficha →';
+        btn.onclick = (function(a){ return function(){ selEmpByArchivo(a); }; })(relArch);
+      }
+      banner.appendChild(icon); banner.appendChild(text); banner.appendChild(btn);
+      det.appendChild(banner);
+    });
+  }
+
+  // TABS
+  var tabsDiv=document.createElement('div'); tabsDiv.className='tabs';
+  var tabList=[['datos','Datos laborales'],['vacaciones','Vacaciones y absentismo'],
+    ['disciplinario','Disciplinario'],['notas','Notas'],['historial','Historial']];
+  tabList.forEach(function(t){
+    var tab=document.createElement('div'); tab.className='tab'+(cTab===t[0]?' on':'');
+    tab.textContent=t[1];
+    tab.addEventListener('click',(function(tid,tel){return function(){
+      cTab=tid; document.querySelectorAll('.tab').forEach(function(x){x.classList.remove('on');});
+      tel.classList.add('on');
+      var tc=document.getElementById('TCONTENT'); if(tc) buildTabContent(emp,es2,tid,tc);
+    };})(t[0],tab));
+    tabsDiv.appendChild(tab);
+  });
+  det.appendChild(tabsDiv);
+
+  // TAB CONTENT
+  var tc=document.createElement('div'); tc.className='tcontent'; tc.id='TCONTENT';
+  det.appendChild(tc);
+  buildTabContent(emp,es2,cTab,tc);
+}
+
+// ============================================================
+// TAB CONTENT BUILDER
+// ============================================================
+function buildTabContent(emp,es2,tab,container){
+  container.innerHTML='';
+  if(tab==='datos') buildDatos(emp,es2,container);
+  else if(tab==='vacaciones') buildVacaciones(emp,es2,container);
+  else if(tab==='disciplinario') buildDisciplinario(emp,es2,container);
+  else if(tab==='notas') buildNotas(emp,es2,container);
+  else if(tab==='historial') buildHistorial(emp,es2,container);
+}
+
+// --- TAB DATOS ---
+function buildDatos(emp,es2,c){
+  function editableCard(label,field,value,type,opts){
+    var div=document.createElement('div'); div.className='ic';
+    var l=document.createElement('div'); l.className='l'; l.textContent=label;
+    var v=document.createElement('div'); v.className='v';
+    v.textContent=value||'-';
+    var btn=document.createElement('button'); btn.className='btn btn-o btn-xs edit-btn'; btn.textContent='✎';
+    btn.onclick=function(){ openEditField(emp,es2,label,field,value,type,opts); };
+    div.appendChild(l); div.appendChild(v); div.appendChild(btn);
+    return div;
+  }
+
+  // Datos personales / laborales
+  var s1=document.createElement('div'); s1.className='sbox';
+  var sh1=document.createElement('div'); sh1.className='shead';
+  var st1=document.createElement('div'); st1.className='stitle'; st1.innerHTML='<span class="sicon">&#128100;</span> Datos del trabajador';
+  sh1.appendChild(st1); s1.appendChild(sh1);
+  var cg1=document.createElement('div'); cg1.className='cg';
+  var fields=[
+    ['Nombre',         'nombre',      getField(emp,es2,'nombre'),      'text',   null],
+    ['DNI / NIE',      'dni',         emp.dni,                          'text',   null],
+    ['F. Nacimiento',  'nacimiento',  fd(getField(emp,es2,'nacimiento')||emp.nacimiento),  'date',   null],
+    ['Email',          'email',       getField(emp,es2,'email'),        'text',   null],
+    ['Telefono',       'telefono',    getField(emp,es2,'telefono'),     'text',   null],
+    ['Cuenta bancaria','cuenta',      es2.cuenta||getField(emp,es2,'cuenta'), 'text', null],
+  ];
+  fields.forEach(function(f){ cg1.appendChild(editableCard(f[0],f[1],f[2],f[3],f[4])); });
+  s1.appendChild(cg1); c.appendChild(s1);
+
+  // Datos contractuales
+  var s2=document.createElement('div'); s2.className='sbox';
+  var sh2=document.createElement('div'); sh2.className='shead';
+  var st2=document.createElement('div'); st2.className='stitle'; st2.innerHTML='<span class="sicon">&#128196;</span> Datos contractuales';
+  sh2.appendChild(st2); s2.appendChild(sh2);
+  var cg2=document.createElement('div'); cg2.className='cg';
+  var soc=getField(emp,es2,'sociedad')||emp.sociedad;
+  var tipo=getField(emp,es2,'tipo_contrato')||emp.tipo_contrato;
+  var fields2=[
+    ['Nº Registro',  'archivo',       emp.archivo,                                                  'text',   null],
+    ['Sociedad',          'sociedad',      soc,                                                           'select', SOCS],
+    ['Despacho',          'despacho',      getField(emp,es2,'despacho'),                                  'select', DESPS],
+    ['Puesto',            'puesto',        getField(emp,es2,'puesto'),                                    'text',   null],
+    ['Categoria',         'categoria',     getField(emp,es2,'categoria'),                                 'text',   null],
+    ['Grupo profesional', 'grupo_profesional', getField(emp,es2,'grupo_profesional'),                     'text',   null],
+    ['Tipo contrato',     'tipo_contrato', tipo+' ('+( CODES[tipo]||''),                                  'select', Object.keys(CODES)],
+    ['% Jornada',         'jornada',       getField(emp,es2,'jornada'),                                   'text',   null],
+    ['H/semana',          'horas',         getField(emp,es2,'horas'),                                     'text',   null],
+    ['Estado',            'estado',        getEstado(emp),                                                'select', ESTADOS_LIST],
+    ['Responsable',       'responsable',   getField(emp,es2,'responsable'),                               'text',   null],
+    ['F. Incorporacion',  'inicio',        fd(getField(emp,es2,'inicio')||emp.inicio),                    'date',   null],
+    ['F. Baja',           'baja',          fd(getField(emp,es2,'baja')||emp.baja),                        'date',   null],
+    ['Motivo baja',       'motivo_baja',   getField(emp,es2,'motivo_baja'),                               'text',   null],
+    ['Fin periodo prueba','periodo_prueba_fin', fd(getField(emp,es2,'periodo_prueba_fin')),                'date',   null],
+    ['Fin contrato',      'fin_contrato',  fd(getField(emp,es2,'fin_contrato')),                          'date',   null],
+  ];
+  fields2.forEach(function(f){ cg2.appendChild(editableCard(f[0],f[1],f[2],f[3],f[4])); });
+  s2.appendChild(cg2); c.appendChild(s2);
+
+  // Datos salariales
+  var s3=document.createElement('div'); s3.className='sbox';
+  var sh3=document.createElement('div'); sh3.className='shead';
+  var st3=document.createElement('div'); st3.className='stitle'; st3.innerHTML='<span class="sicon">&#128176;</span> Datos salariales';
+  sh3.appendChild(st3); s3.appendChild(sh3);
+  var cg3=document.createElement('div'); cg3.className='cg';
+  var sal=getField(emp,es2,'salario')||emp.salario;
+  var salMen=getField(emp,es2,'salario_mensual')||(sal?Math.round(parseFloat(sal)/12):'')||'';
+  var fields3=[
+    ['Salario bruto/ano','salario',getField(emp,es2,'salario')||emp.salario,'text',null],
+    ['Salario mensual','salario_mensual',salMen,'text',null],
+    ['Caducidad doc.','caducidad_doc',fd(getField(emp,es2,'caducidad_doc')||emp.caducidad_doc),'date',null],
+  ];
+  fields3.forEach(function(f){ cg3.appendChild(editableCard(f[0],f[1],f[2],f[3],f[4])); });
+  s3.appendChild(cg3); c.appendChild(s3);
+}
+
+// --- TAB VACACIONES ---
+function buildVacaciones(emp,es2,c){
+  var vac=calcVacaciones(emp);
+
+  // Summary - current year + next year adelantos
+  var hoyAno = new Date().getFullYear();
+  var vac = calcVacaciones(emp, hoyAno);
+  var vac2 = calcVacaciones(emp, hoyAno+1);
+  var vcg=document.createElement('div'); vcg.className='vac-grid';
+  var vcards=[
+    {n:vac.generadas,l:'Generadas '+hoyAno+' ('+vac.tipo+')',cls:'info'},
+    {n:vac.disfrutadas,l:'Disfrutadas '+hoyAno,cls:'ok'},
+    {n:vac.pendientes,l:'Pendientes '+hoyAno,cls:vac.pendientes>0?'warn':'ok'},
+    {n:vac.solicitadas,l:'Solicitadas '+hoyAno,cls:vac.solicitadas>0?'warn':'neutral'},
+  ];
+  vcards.forEach(function(v){
+    var div=document.createElement('div'); div.className='vac-card '+v.cls;
+    var n=document.createElement('div'); n.className='vn'; n.textContent=v.n;
+    var l=document.createElement('div'); l.className='vl'; l.textContent=v.l;
+    div.appendChild(n); div.appendChild(l); vcg.appendChild(div);
+  });
+  c.appendChild(vcg);
+  // Show next year adelantos if any
+  if(vac2.disfrutadas>0){
+    var vcg2=document.createElement('div'); vcg2.className='vac-grid';
+    vcg2.style.cssText='margin-top:-.3rem;margin-bottom:.75rem';
+    var vcards2=[
+      {n:vac2.generadas,l:'Generadas '+(hoyAno+1),cls:'info'},
+      {n:vac2.disfrutadas,l:'Adelantados '+(hoyAno+1),cls:'warn'},
+      {n:Math.max(0,vac2.generadas-vac2.disfrutadas),l:'Disponibles '+(hoyAno+1),cls:'neutral'},
+      {n:0,l:'',cls:'neutral'},
+    ];
+    vcards2.forEach(function(v){
+      var div=document.createElement('div'); div.className='vac-card '+v.cls;
+      if(!v.l){div.style.visibility='hidden';}
+      var n=document.createElement('div'); n.className='vn'; n.textContent=v.n;
+      var l=document.createElement('div'); l.className='vl'; l.textContent=v.l;
+      div.appendChild(n); div.appendChild(l); vcg2.appendChild(div);
+    });
+    c.appendChild(vcg2);
+  }
+
+  // Section tabs: Vacaciones | Absentismo
+  var stabs=document.createElement('div'); stabs.className='section-tabs';
+  [['vac-tab','Vacaciones'],['abs-tab','Absentismo']].forEach(function(t,i){
+    var st=document.createElement('div'); st.className='stab'+(i===0?' on':''); st.textContent=t[1];
+    st.addEventListener('click',(function(id,el){return function(){
+      document.querySelectorAll('.stab').forEach(function(x){x.classList.remove('on');}); el.classList.add('on');
+      document.getElementById('vac-section').style.display=id==='vac-tab'?'block':'none';
+      document.getElementById('abs-section').style.display=id==='abs-tab'?'block':'none';
+    };})(t[0],st));
+    stabs.appendChild(st);
+  });
+  c.appendChild(stabs);
+
+  // VAC SECTION
+  var vSec=document.createElement('div'); vSec.id='vac-section';
+  var vacRecs=(es2.records||[]).filter(function(r){return r.tipo==='vacaciones';});
+  var vHead=document.createElement('div'); vHead.className='shead';
+  var vTitle=document.createElement('div'); vTitle.className='stitle'; vTitle.innerHTML='&#127958; Periodos de vacaciones';
+  var vBtn=document.createElement('button'); vBtn.className='btn btn-r btn-sm'; vBtn.textContent='+ Solicitar';
+  vBtn.onclick=function(){ document.getElementById('RT').value='vacaciones'; openModal('MR'); };
+  vHead.appendChild(vTitle); vHead.appendChild(vBtn); vSec.appendChild(vHead);
+  if(!vacRecs.length){
+    var emp2=document.createElement('div'); emp2.className='empty-s'; emp2.textContent='Sin periodos de vacaciones registrados'; vSec.appendChild(emp2);
+  } else {
+    vacRecs.sort(function(a,b){return b.f1.localeCompare(a.f1);}).forEach(function(r){
+      vSec.appendChild(buildRecItem(r,emp.dni));
+    });
+  }
+  c.appendChild(vSec);
+
+  // ABS SECTION
+  var aSec=document.createElement('div'); aSec.id='abs-section'; aSec.style.display='none';
+  var absRecs=(es2.records||[]).filter(function(r){return r.tipo!=='vacaciones';});
+  var aHead=document.createElement('div'); aHead.className='shead';
+  var aTitle=document.createElement('div'); aTitle.className='stitle'; aTitle.innerHTML='&#128197; Absentismo y permisos';
+  var aBtn=document.createElement('button'); aBtn.className='btn btn-r btn-sm'; aBtn.textContent='+ Ausencia';
+  aBtn.onclick=function(){ openModal('MR'); };
+  aHead.appendChild(aTitle); aHead.appendChild(aBtn); aSec.appendChild(aHead);
+  if(!absRecs.length){
+    var emp3=document.createElement('div'); emp3.className='empty-s'; emp3.textContent='Sin ausencias registradas'; aSec.appendChild(emp3);
+  } else {
+    absRecs.sort(function(a,b){return b.f1.localeCompare(a.f1);}).forEach(function(r){
+      aSec.appendChild(buildRecItem(r,emp.dni));
+    });
+  }
+  c.appendChild(aSec);
+}
+
+function buildRecItem(r,dni){
+  var div=document.createElement('div'); div.className='rec-item';
+  var dot=document.createElement('div'); dot.className='rec-dot';
+  var tc={vacaciones:'#388bfd','it-comun':'#bc8cff','it-accidente-lab':'#bc8cff','it-accidente-itin':'#bc8cff',maternidad:'#bc8cff'};
+  dot.style.background=tc[r.tipo]||'#3fb950';
+  var body=document.createElement('div'); body.className='rec-body';
+  var tit=document.createElement('div'); tit.className='rec-title';
+  var tk=document.createElement('span'); tk.className='tk '+(r.tipo==='vacaciones'?'tk-vac':r.tipo.indexOf('it-')===0||r.tipo==='maternidad'?'tk-it':'tk-per');
+  tk.textContent=r.tipo.replace(/-/g,' ').replace(/it /,'IT ');
+  tit.appendChild(tk);
+  if(r.subtipo){var sp=document.createTextNode(' '+r.subtipo); tit.appendChild(sp);}
+  var dates=document.createElement('div'); dates.className='rec-dates';
+  var anoTag = (r.ano_devengo&&r.tipo==='vacaciones') ? ' ['+r.ano_devengo+']' : '';
+  dates.textContent=fd(r.f1)+(r.f2&&r.f2!==r.f1?' al '+fd(r.f2):'')+(r.dias?' ('+r.dias+' dias)':'')+anoTag;
+  var estat=document.createElement('span'); estat.className='estado-badge est-'+(r.estado||'apr').substring(0,3);
+  estat.style.marginLeft='.35rem'; estat.textContent=r.estado||'aprobado';
+  dates.appendChild(estat);
+  body.appendChild(tit); body.appendChild(dates);
+  if(r.obs){var rn=document.createElement('div'); rn.className='rec-note'; rn.textContent=r.obs; body.appendChild(rn);}
+  var acts=document.createElement('div'); acts.className='rec-actions';
+  var del=document.createElement('button'); del.className='btn btn-o btn-xs'; del.textContent='Borrar';
+  del.onclick=(function(id,d){return function(){delRec(id,d);};})(r.id,dni);
+  acts.appendChild(del); div.appendChild(dot); div.appendChild(body); div.appendChild(acts);
+  return div;
+}
+
+// --- TAB DISCIPLINARIO ---
+function buildDisciplinario(emp,es2,c){
+  var list=es2.disciplinario||[];
+  var head=document.createElement('div'); head.className='shead';
+  var tit=document.createElement('div'); tit.className='stitle'; tit.innerHTML='&#9878; Expedientes disciplinarios';
+  var btn=document.createElement('button'); btn.className='btn btn-r btn-sm'; btn.textContent='+ Nuevo';
+  btn.onclick=function(){openModal('MD');};
+  head.appendChild(tit); head.appendChild(btn); c.appendChild(head);
+  if(!list.length){var empty=document.createElement('div'); empty.className='empty-s'; empty.textContent='Sin registros disciplinarios'; c.appendChild(empty); return;}
+  var tN={'amo-verbal':'Amonestacion verbal','amo-escrita':'Amonestacion escrita','sancion-emp':'Sancion empleo','expediente':'Expediente','despido-disc':'Despido disciplinario','disc-otros':'Otros'};
+  list.sort(function(a,b){return b.fecha_hecho.localeCompare(a.fecha_hecho);}).forEach(function(r){
+    var div=document.createElement('div'); div.className='disc-item';
+    var dh=document.createElement('div'); dh.className='disc-head';
+    var dt=document.createElement('span'); dt.className='disc-tipo'; dt.textContent=tN[r.tipo]||r.tipo;
+    var df2=document.createElement('span'); df2.className='disc-fecha'; df2.textContent=fd(r.fecha_hecho);
+    var dest=document.createElement('span'); dest.className='estado-badge';
+    var estCls={abierto:'est-sol','en-tramite':'est-sol',resuelto:'est-apr',archivado:'est-dis'};
+    dest.className='estado-badge '+(estCls[r.estado]||'est-sol'); dest.textContent=r.estado;
+    dh.appendChild(dt); dh.appendChild(df2); dh.appendChild(dest);
+    var db=document.createElement('div'); db.style.cssText='font-size:.75rem;margin-bottom:.15rem;'; db.textContent=r.desc||'';
+    var dact=document.createElement('div'); dact.style.cssText='display:flex;justify-content:flex-end;margin-top:.3rem';
+    var del=document.createElement('button'); del.className='btn btn-o btn-xs'; del.textContent='Borrar';
+    del.onclick=(function(id,d){return function(){delDisc(id,d);};})(r.id,emp.dni);
+    dact.appendChild(del); div.appendChild(dh); div.appendChild(db); div.appendChild(dact);
+    c.appendChild(div);
+  });
+}
+
+// --- TAB NOTAS ---
+function buildNotas(emp,es2,c){
+  var list=es2.notas||[];
+  var head=document.createElement('div'); head.className='shead';
+  var tit=document.createElement('div'); tit.className='stitle'; tit.innerHTML='&#128221; Notas internas';
+  var btn=document.createElement('button'); btn.className='btn btn-r btn-sm'; btn.textContent='+ Nota';
+  btn.onclick=function(){openModal('MN');};
+  head.appendChild(tit); head.appendChild(btn); c.appendChild(head);
+  if(!list.length){var empty=document.createElement('div'); empty.className='empty-s'; empty.textContent='Sin notas'; c.appendChild(empty); return;}
+  list.slice().reverse().forEach(function(n){
+    var div=document.createElement('div'); div.className='nota-item';
+    var nh=document.createElement('div'); nh.className='nota-head';
+    var nm=document.createElement('div'); nm.className='nota-meta'; nm.textContent=n.fecha+' - '+n.usuario;
+    var acts=document.createElement('div'); acts.style.display='flex'; acts.style.gap='.25rem';
+    var del=document.createElement('button'); del.className='btn btn-o btn-xs'; del.textContent='Borrar';
+    del.onclick=(function(id,d){return function(){delNota(id,d);};})(n.id,emp.dni);
+    acts.appendChild(del); nh.appendChild(nm); nh.appendChild(acts);
+    var nt=document.createElement('div'); nt.className='nota-text'; nt.textContent=n.texto;
+    div.appendChild(nh); div.appendChild(nt); c.appendChild(div);
+  });
+}
+
+// --- TAB HISTORIAL ---
+function buildHistorial(emp,es2,c){
+  var list=es2.historial||[];
+  var head=document.createElement('div'); head.className='shead';
+  var tit=document.createElement('div'); tit.className='stitle'; tit.innerHTML='&#128336; Historial de cambios';
+  head.appendChild(tit); c.appendChild(head);
+  if(!list.length){var empty=document.createElement('div'); empty.className='empty-s'; empty.textContent='Sin cambios registrados'; c.appendChild(empty); return;}
+  list.slice().reverse().forEach(function(h){
+    var div=document.createElement('div'); div.className='hist-item';
+    var fd2=document.createElement('div'); fd2.className='hist-fecha'; fd2.textContent=h.fecha;
+    var fc=document.createElement('div'); fc.className='hist-campo'; fc.textContent=h.campo;
+    var fv=document.createElement('div'); fv.className='hist-vals';
+    fv.innerHTML='<span style="color:var(--dg)">'+(h.anterior||'-')+'</span> &rarr; <span style="color:var(--success)">'+(h.nuevo||'-')+'</span>';
+    var fu=document.createElement('div'); fu.className='hist-user'; fu.textContent='Modificado por: '+h.usuario;
+    div.appendChild(fd2); div.appendChild(fc); div.appendChild(fv); div.appendChild(fu);
+    c.appendChild(div);
+  });
+}
+
+// ============================================================
+// EDIT FIELD
+// ============================================================
+function openEditField(emp,es2,label,field,currentVal,type,opts){
+  editField={emp:emp,es2:es2,label:label,field:field,type:type,opts:opts};
+  editOldVal=currentVal;
+  document.getElementById('MEC-title').textContent='Editar: '+label;
+  var body=document.getElementById('MEC-body'); body.innerHTML='';
+  var fg=document.createElement('div'); fg.className='fg';
+  var lbl=document.createElement('label'); lbl.textContent=label;
+  fg.appendChild(lbl);
+  if(type==='select'&&opts){
+    var sel=document.createElement('select'); sel.id='EC-INPUT';
+    // If editing despacho, use dynamic DESPS array
+    var optList = (editField.field==='despacho') ? DESPS : opts;
+    optList.forEach(function(o){var op=document.createElement('option'); op.value=o; op.textContent=o; if(o===currentVal||o.indexOf(currentVal)>=0) op.selected=true; sel.appendChild(op);});
+    // Add empty option at start
+    var emptyOpt=document.createElement('option'); emptyOpt.value=''; emptyOpt.textContent='-- Selecciona --';
+    sel.insertBefore(emptyOpt, sel.firstChild);
+    fg.appendChild(sel);
+  } else if(type==='date'){
+    var inp=document.createElement('input'); inp.type='date'; inp.id='EC-INPUT';
+    // Get raw value from edits or base emp
+    var es2c=editField.es2;
+    var raw=(es2c.edits&&es2c.edits[editField.field]!==undefined)?es2c.edits[editField.field]:(editField.emp[editField.field]||'');
+    // Convert dd/mm/yyyy to yyyy-mm-dd if needed
+    if(raw&&raw.indexOf('/')>0){var pp=raw.split('/');raw=pp[2]+'-'+pp[1]+'-'+pp[0];}
+    // Ignore ANULADA
+    if(raw==='ANULADA') raw='';
+    inp.value=raw.substring(0,10)||'';;
+    fg.appendChild(inp);
+  } else {
+    var inp2=document.createElement('input'); inp2.type='text'; inp2.id='EC-INPUT';
+    inp2.value=(es2.edits&&es2.edits[field]!==undefined)?es2.edits[field]:(emp[field]||'');
+    fg.appendChild(inp2);
+  }
+  body.appendChild(fg);
+  document.getElementById('MEC').classList.add('open');
+}
+
+function saveEdit(){
+  if(!editField)return;
+  var inp=document.getElementById('EC-INPUT'); if(!inp)return;
+  var newVal=inp.value.trim();
+  var emp=editField.emp, field=editField.field;
+  // se vuelve a leer la ficha: la sincronizacion puede haberla renovado con el modal abierto
+  var es2=ges(emp.dni);
+  if(!es2.edits) es2.edits={};
+  var oldVal=es2.edits[field]!==undefined?es2.edits[field]:(emp[field]||'');
+  if(newVal===oldVal){closeModal('MEC');return;}
+  // Special handling for DNI change - update the key in ST
+  if(field==='dni' && newVal && newVal!==emp.dni){
+    if(getEmp(newVal)){ alert('Ya existe un empleado con ese DNI.'); return; }
+    var oldDni=emp.dni;
+    // Copy old ST entry to new DNI
+    if(ST[oldDni]){ ST[newVal]=JSON.parse(JSON.stringify(ST[oldDni])); delete ST[oldDni]; }
+    // Update emp object dni
+    emp.dni=newVal;
+    cDni=newVal;
+    // Re-get es2 with new key
+    es2=ges(newVal);
+    if(!es2.edits) es2.edits={};
+    // alias para que el cambio de DNI se mantenga al recargar
+    if(!es2.edits.dni_anterior) es2.edits.dni_anterior=oldDni;
+  }
+  // Allow clearing fields (empty string is valid - removes baja date etc)
+  if(newVal==='') { delete es2.edits[field]; } else { es2.edits[field]=newVal; }
+  // If clearing baja date, also clear estado BAJA if it was auto-set
+  if(field==='baja' && newVal==='' && (es2.edits.estado==='BAJA'||!es2.edits.estado)){
+    delete es2.edits.estado;
+  }
+  // If sociedad changed, recalculate archivo number automatically
+  if(field==='sociedad' && newVal!==''){
+    var pfxNew2 = {'ASCENT LEGAL STRATEGIES SOCIEDAD LIM':1,'ASESORÍA BOWIE, S.L':2,
+      'CENTRO DE FORMACION EDUCAR SIN FRONTERAS':3,'DESKO HISPANOAMERICANA CORPORATION S':4,
+      'QUANTUM LEGAL SERVICES, SOCIEDAD LIM':5}[newVal]||0;
+    es2.edits.archivo = getNextArchivo(newVal, pfxNew2, emp.dni);
+    console.log('Archivo recalculado:',es2.edits.archivo,'para',newVal);
+  }
+  // Register in historial
+  var today=new Date().toLocaleDateString('es-ES');
+  es2.historial.push({id:Date.now()+'',fecha:today,campo:editField.label,anterior:oldVal,nuevo:newVal,usuario:USER});
+  closeModal('MEC');
+  saveAll();
+  renderDetail(emp); // re-render
+  renderList(); // update lateral
+}
+
+// ============================================================
+// MODAL RECORDS
+// ============================================================
+function openModal(id){
+  document.getElementById(id).classList.add('open');
+  if(id==='MR'){
+    // Always set default year correctly
+    var hoyAno = new Date().getFullYear();
+    document.getElementById('RANO').value = ''+hoyAno;
+    // Show/hide based on current tipo
+    var t = document.getElementById('RT').value;
+    document.getElementById('fg-ano-dev').style.display = t==='vacaciones' ? 'block' : 'none';
+  }
+}
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+
+function updMR(){
+  var t=document.getElementById('RT').value;
+  var isVac=t==='vacaciones';
+  document.getElementById('LF1').textContent=isVac?'Fecha inicio':'Fecha inicio';
+  document.getElementById('LF2').textContent=isVac?'Fecha fin':'Fecha fin';
+  document.getElementById('REST').value=isVac?'solicitado':'aprobado';
+  document.getElementById('fg-ano-dev').style.display=isVac?'block':'none';
+  if(isVac){
+    var hoy=new Date();
+    document.getElementById('RANO').value=''+hoy.getFullYear();
+  }
+  autoCalcDias();
+}
+
+function autoCalcDias(){
+  var f1=document.getElementById('RF1').value;
+  var f2=document.getElementById('RF2').value;
+  var t=document.getElementById('RT').value;
+  if(!f1||!f2) return;
+  var dias = 0;
+  if(t==='vacaciones'){
+    var emp=getEmp(cDni); if(!emp) return;
+    var es2=ges(cDni);
+    var soc=getField(emp,es2,'sociedad')||emp.sociedad||'';
+    var educar=isEducar(soc);
+    dias = educar ? diasNaturales(f1,f2) : diasLaborables(f1,f2);
+  } else {
+    // For absentismo: count calendar days
+    dias = diasNaturales(f1,f2);
+  }
+  document.getElementById('RD').value = dias;
+}
+
+function saveRec(){
+  if(!cDni)return;
+  var f1=document.getElementById('RF1').value; if(!f1){alert('Indica la fecha de inicio');return;}
+  var f2=document.getElementById('RF2').value||f1;
+  var tipo=document.getElementById('RT').value;
+  // Auto-calculate days for vacaciones based on sociedad
+  var emp=getEmp(cDni); var es2=ges(cDni);
+  var soc=getField(emp,es2,'sociedad')||emp.sociedad||'';
+  var educar=isEducar(soc);
+  var diasCalc;
+  if(tipo==='vacaciones'){
+    diasCalc = educar ? diasNaturales(f1,f2) : diasLaborables(f1,f2);
+  } else {
+    diasCalc = calcDias(f1,f2);
+  }
+  var diasInput = document.getElementById('RD').value;
+  var estadoVal = document.getElementById('REST').value;
+  var obsVal = document.getElementById('ROBS').value.trim();
+  var diasFinal = parseFloat(diasInput||''+diasCalc) || 0;
+
+  if(tipo==='vacaciones'){
+    var anoDevengo = parseInt(document.getElementById('RANO').value||''+new Date().getFullYear());
+    // Check remaining balance for selected year
+    var empTmp = getEmp(cDni);
+    var vacTmp = empTmp ? calcVacaciones(empTmp, anoDevengo) : null;
+    var pendienteAno = vacTmp ? vacTmp.pendientes : 999;
+
+    if(diasFinal > pendienteAno && pendienteAno >= 0){
+      // Split: pendienteAno days go to current year, rest to next year
+      var diasAno1 = Math.round(pendienteAno * 10) / 10;
+      var diasAno2 = Math.round((diasFinal - diasAno1) * 10) / 10;
+      if(diasAno1 > 0){
+        ges(cDni).records.push({id:Date.now()+'_1',tipo:tipo,f1:f1,f2:f2,
+          dias:''+diasAno1,estado:estadoVal,obs:obsVal,ano_devengo:''+anoDevengo});
+      }
+      if(diasAno2 > 0){
+        ges(cDni).records.push({id:Date.now()+'_2',tipo:tipo,f1:f1,f2:f2,
+          dias:''+diasAno2,estado:estadoVal,obs:'Exceso '+(anoDevengo+1)+': '+obsVal,
+          ano_devengo:''+(anoDevengo+1)});
+      }
+    } else {
+      ges(cDni).records.push({id:Date.now()+'',tipo:tipo,f1:f1,f2:f2,
+        dias:''+diasFinal,estado:estadoVal,obs:obsVal,ano_devengo:''+anoDevengo});
+    }
+  } else {
+    ges(cDni).records.push({id:Date.now()+'',tipo:tipo,f1:f1,f2:f2,
+      dias:''+diasFinal,estado:estadoVal,obs:obsVal,ano_devengo:''});
+  }
+  closeModal('MR');
+  document.getElementById('RF1').value=''; document.getElementById('RF2').value='';
+  document.getElementById('RD').value=''; document.getElementById('ROBS').value='';
+  saveAll();
+  var emp=getEmp(cDni); if(emp) renderDetail(emp);
+}
+function calcDias(f1,f2){
+  if(!f1||!f2)return 0;
+  var d=(new Date(f2)-new Date(f1))/86400000+1;
+  return Math.max(0,Math.round(d));
+}
+function delRec(id,dni){
+  if(!confirm('Eliminar registro?'))return;
+  var es2=ges(dni); es2.records=es2.records.filter(function(r){return r.id!==id;});
+  saveAll(); var emp=getEmp(dni); if(emp) renderDetail(emp);
+}
+
+function saveDisc(){
+  if(!cDni)return;
+  var r={
+    id:Date.now()+'',tipo:document.getElementById('DT').value,
+    fecha_hecho:document.getElementById('DFH').value,
+    fecha_com:document.getElementById('DFC').value,
+    desc:document.getElementById('DDESC').value.trim(),
+    implicados:document.getElementById('DIMP').value.trim(),
+    estado:document.getElementById('DEST').value,
+    obs:document.getElementById('DOBS').value.trim()
+  };
+  ges(cDni).disciplinario.push(r);
+  closeModal('MD');
+  ['DFH','DFC','DDESC','DIMP','DOBS'].forEach(function(id){document.getElementById(id).value='';});
+  saveAll(); var emp=getEmp(cDni); if(emp) renderDetail(emp);
+}
+function delDisc(id,dni){
+  if(!confirm('Eliminar?'))return;
+  var es2=ges(dni); es2.disciplinario=es2.disciplinario.filter(function(r){return r.id!==id;});
+  saveAll(); var emp=getEmp(dni); if(emp) renderDetail(emp);
+}
+
+function saveNota(){
+  if(!cDni)return;
+  var txt=document.getElementById('NTXT').value.trim(); if(!txt)return;
+  var today=new Date().toLocaleDateString('es-ES');
+  ges(cDni).notas.push({id:Date.now()+'',fecha:today,usuario:USER,texto:txt});
+  closeModal('MN'); document.getElementById('NTXT').value='';
+  saveAll(); var emp=getEmp(cDni); if(emp) renderDetail(emp);
+}
+function delNota(id,dni){
+  if(!confirm('Eliminar nota?'))return;
+  var es2=ges(dni); es2.notas=es2.notas.filter(function(n){return n.id!==id;});
+  saveAll(); var emp=getEmp(dni); if(emp) renderDetail(emp);
+}
+
+// ============================================================
+// REPORTS
+// ============================================================
+function openReports(){ document.getElementById('MREP').classList.add('open'); }
+
+function genReport(tipo){
+  closeModal('MREP');
+  if(typeof XLSX==='undefined'){
+    var s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    s.onload=function(){runReport(tipo);}; document.head.appendChild(s);
+  } else { runReport(tipo); }
+}
+
+function runReport(tipo){
+  var wb=XLSX.utils.book_new(), rows;
+  var today=new Date().toLocaleDateString('es-ES').replace(/\//g,'-');
+
+  function empBase(e){
+    var es2=ges(e.dni);
+    return [emp.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),getField(e,es2,'puesto'),getEstado(e)];
+  }
+
+  if(tipo==='bbdd'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Puesto','Categoria','Email','Telefono','F.Nacimiento','F.Incorporacion','F.Baja','Motivo baja','% Jornada','H/Sem','Tipo contrato','Salario bruto/ano','Salario mensual','Cuenta bancaria','Caducidad doc','Estado','Responsable']];
+    EMPS_BASE.forEach(function(e){
+      var es2=ges(e.dni);
+      rows.push([e.archivo,e.nombre,e.dni,
+        getField(e,es2,'sociedad')||e.sociedad,getField(e,es2,'despacho'),getField(e,es2,'puesto'),
+        getField(e,es2,'categoria'),getField(e,es2,'email'),getField(e,es2,'telefono'),
+        fd(getField(e,es2,'nacimiento')||e.nacimiento),fd(getField(e,es2,'inicio')||e.inicio),fd(getField(e,es2,'baja')||e.baja),
+        getField(e,es2,'motivo_baja'),getField(e,es2,'jornada'),getField(e,es2,'horas'),
+        getField(e,es2,'tipo_contrato'),getField(e,es2,'salario'),getField(e,es2,'salario_mensual'),
+        es2.cuenta||getField(e,es2,'cuenta'),fd(getField(e,es2,'caducidad_doc')||e.caducidad_doc),
+        getEstado(e),getField(e,es2,'responsable')]);
+    });
+  } else if(tipo==='vacaciones'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','F.Incorporacion','Tipo computo','Dias generados','Disfrutados','Pendientes','Solicitudes pendientes']];
+    EMPS_BASE.forEach(function(e){
+      var v=calcVacaciones(e), es2=ges(e.dni);
+      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+        fd(getField(e,es2,'inicio')||e.inicio),v.tipo,v.generadas,v.disfrutadas,v.pendientes,v.solicitadas]);
+    });
+  } else if(tipo==='absentismo'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Estado emp.','Tipo','F.Inicio','F.Fin','Dias','Estado','Observaciones']];
+    EMPS_BASE.forEach(function(e){
+      var es2=ges(e.dni);
+      (es2.records||[]).filter(function(r){return r.tipo!=='vacaciones';}).forEach(function(r){
+        rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+          getEstado(e),r.tipo,fd(r.f1),fd(r.f2),r.dias||'',r.estado||'',r.obs||'']);
+      });
+    });
+  } else if(tipo==='disciplinario'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Tipo','Fecha hecho','Fecha com.','Estado','Descripcion','Implicados','Observaciones']];
+    EMPS_BASE.forEach(function(e){
+      var es2=ges(e.dni);
+      (es2.disciplinario||[]).forEach(function(r){
+        rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+          r.tipo,fd(r.fecha_hecho),fd(r.fecha_com),r.estado,r.desc||'',r.implicados||'',r.obs||'']);
+      });
+    });
+  } else if(tipo==='salarial'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Puesto','% Jornada','Salario bruto/ano','Salario mensual','Estado']];
+    EMPS_BASE.forEach(function(e){
+      var es2=ges(e.dni);
+      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+        getField(e,es2,'puesto'),getField(e,es2,'jornada'),getField(e,es2,'salario'),
+        getField(e,es2,'salario_mensual'),getEstado(e)]);
+    });
+  } else if(tipo==='cuentas'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Cuenta bancaria','Estado']];
+    EMPS_BASE.filter(function(e){return getEstado(e)==='ACTIVO';}).forEach(function(e){
+      var es2=ges(e.dni);
+      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+        es2.cuenta||getField(e,es2,'cuenta'),getEstado(e)]);
+    });
+  } else if(tipo==='caducidades'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Caducidad doc.','Alerta','Estado']];
+    EMPS_BASE.forEach(function(e){
+      var es2=ges(e.dni); var al=alDoc(getField(e,es2,'caducidad_doc')||e.caducidad_doc);
+      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+        fd(getField(e,es2,'caducidad_doc')||e.caducidad_doc),al.t,getEstado(e)]);
+    });
+  } else if(tipo==='historial'){
+    rows=[['N Registro','Nombre','DNI','Sociedad','Fecha','Campo','Valor anterior','Valor nuevo','Usuario']];
+    EMPS_BASE.forEach(function(e){
+      var es2=ges(e.dni);
+      (es2.historial||[]).forEach(function(h){
+        rows.push([e.archivo,e.nombre,e.dni,sA(e.sociedad),h.fecha,h.campo,h.anterior,h.nuevo,h.usuario]);
+      });
+    });
+  }
+
+  if(rows&&rows.length>1){
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(rows),tipo);
+    XLSX.writeFile(wb,'RRHH_'+tipo+'_'+today+'.xlsx');
+  } else { alert('No hay datos para exportar en este informe.'); }
+}
+</script>
+
+<!-- MODAL NUEVO CONTRATO -->
+<div class="mo" id="MNC">
+  <div class="md" style="width:520px">
+    <h3>&#128196; Nuevo contrato — archivar anterior y activar</h3>
+    <p style="font-size:.75rem;color:var(--mu);margin-bottom:.75rem">El contrato actual quedará archivado en el historial. Rellena los datos del nuevo contrato.</p>
+    <div style="background:rgba(248,81,73,.08);border:1px solid rgba(248,81,73,.2);border-radius:5px;padding:.6rem .75rem;margin-bottom:.75rem;font-size:.75rem;color:var(--dg)">
+      <strong>Contrato anterior:</strong> <span id="MNC-anterior"></span>
+    </div>
+    <div style="font-size:.78rem;font-weight:600;margin-bottom:.5rem;color:var(--bl)">Datos del nuevo contrato:</div>
+    <div class="fr2">
+      <div class="fg"><label>Fecha inicio nuevo contrato *</label><input type="date" id="MNC-inicio"></div>
+      <div class="fg"><label>Tipo contrato</label>
+        <select id="MNC-tipo">
+          <option value="100">100 - Indefinido tiempo completo</option>
+          <option value="200">200 - Indefinido tiempo parcial</option>
+          <option value="300">300 - Fijo-discontinuo</option>
+          <option value="33">33 - Practicas profesionales</option>
+          <option value="44">44 - Formacion en alternancia</option>
+          <option value="402">402 - Temporal produccion t.completo</option>
+          <option value="502">502 - Temporal produccion t.parcial</option>
+          <option value="410">410 - Sustitucion t.completo</option>
+          <option value="510">510 - Sustitucion t.parcial</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Sociedad</label>
+        <select id="MNC-sociedad">
+          <option value="ASCENT LEGAL STRATEGIES SOCIEDAD LIM">Ascent</option>
+          <option value="ASESORÍA BOWIE, S.L">Bowie</option>
+          <option value="CENTRO DE FORMACION EDUCAR SIN FRONTERAS">Educar</option>
+          <option value="DESKO HISPANOAMERICANA CORPORATION S">Desko</option>
+          <option value="QUANTUM LEGAL SERVICES, SOCIEDAD LIM">Quantum</option>
+        </select>
+      </div>
+      <div class="fg"><label>Despacho</label>
+        <select id="MNC-despacho">
+          <option value="">-- Selecciona --</option>
+          <!-- MNC-despacho options -->
+        </select>
+      </div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>% Jornada</label><input type="number" id="MNC-jornada" placeholder="100" min="0" max="100"></div>
+      <div class="fg"><label>Salario bruto/ano</label><input type="number" id="MNC-salario"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Fin periodo de prueba</label><input type="date" id="MNC-pp"></div>
+      <div class="fg"><label>Fin contrato (si temporal)</label><input type="date" id="MNC-fin"></div>
+    </div>
+    <div id="MNC-err" style="color:var(--dg);font-size:.75rem;display:none;margin:.3rem 0"></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MNC')">Cancelar</button>
+      <button class="btn btn-r" onclick="saveNuevoContrato()">Archivar anterior y activar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL GESTIONAR DESPACHOS -->
+<div class="mo" id="MGD">
+  <div class="md" style="width:420px">
+    <h3>&#127970; Gestionar despachos</h3>
+    <p style="font-size:.77rem;color:var(--mu);margin-bottom:.75rem">Los despachos se guardan automáticamente y aparecen en todos los desplegables del portal.</p>
+    <div id="MGD-LIST" style="max-height:250px;overflow-y:auto;margin-bottom:.75rem"></div>
+    <div class="fr2">
+      <div class="fg"><input type="text" id="MGD-NEW" placeholder="Nombre del nuevo despacho..." style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase()"></div>
+      <div><button class="btn btn-r" style="margin-top:1.5rem" onclick="addDespacho()">+ Añadir</button></div>
+    </div>
+    <div id="MGD-MSG" style="font-size:.75rem;min-height:1rem;margin:.3rem 0"></div>
+    <div class="ma"><button class="btn btn-o" onclick="closeModal('MGD')">Cerrar</button></div>
+  </div>
+</div>
+
+<div class="mo" id="MIM">
+  <div class="md" style="width:560px">
+    <h3>&#128229; Importar vacaciones desde Excel</h3>
+    <p style="font-size:.77rem;color:var(--mu);margin-bottom:.5rem">
+      Copia y pega desde Excel. Cabecera obligatoria en primera fila.<br>
+      <strong>Formato requerido:</strong> DNI &nbsp;|&nbsp; FECHA INICIO &nbsp;|&nbsp; FECHA FIN &nbsp;|&nbsp; DIAS (opcional) &nbsp;|&nbsp; AÑO DEVENGO (opcional)
+    </p>
+    <div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:5px;padding:.5rem .75rem;font-size:.72rem;color:var(--bl);margin-bottom:.65rem">
+      &#128161; Si no pones días, los calcula automáticamente (laborables para todas las sociedades excepto Educar que usa naturales).<br>
+      &#128161; Si no pones año de devengo, lo asigna según el saldo disponible — el exceso pasa automáticamente a 2027.
+    </div>
+    <div class="fg"><label>Pegar datos desde Excel (Tab-separado)</label>
+      <textarea id="IMP-DATA" rows="8" style="font-family:monospace;font-size:.71rem" placeholder="DNI&#9;FECHA INICIO&#9;FECHA FIN&#9;DIAS&#9;AÑO DEVENGO&#10;12345678A&#9;01/07/2026&#9;15/07/2026&#9;&#9;&#10;Z1234567B&#9;01/08/2026&#9;15/08/2026&#9;11&#9;2026"></textarea>
+    </div>
+    <div id="IMP-RES" style="font-size:.75rem;min-height:1.5rem;margin:.4rem 0;padding:.4rem;border-radius:4px"></div>
+    <div id="IMP-DETAIL" style="font-size:.7rem;color:var(--mu);max-height:120px;overflow-y:auto;margin-bottom:.4rem"></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MIM')">Cancelar</button>
+      <button class="btn btn-r" onclick="doImport()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+function openImport() { document.getElementById('MIM').classList.add('open'); }
+
+function openGestionDespachos(){
+  renderDespachosList();
+  document.getElementById('MGD').classList.add('open');
+}
+
+function renderDespachosList(){
+  var list = document.getElementById('MGD-LIST');
+  list.innerHTML = '';
+  DESPS.forEach(function(d, i){
+    var row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:.3rem .5rem;border-bottom:1px solid var(--b);font-size:.8rem';
+    var name = document.createElement('span'); name.textContent = d;
+    var del = document.createElement('button'); del.className='btn btn-o btn-xs'; del.textContent='Borrar';
+    del.onclick = (function(idx){ return function(){
+      if(confirm('¿Borrar despacho "'+DESPS[idx]+'"?')){
+        DESPS.splice(idx,1);
+        saveDespachos();
+        renderDespachosList();
+      }
+    };})(i);
+    row.appendChild(name); row.appendChild(del); list.appendChild(row);
+  });
+}
+
+function addDespacho(){
+  var val = document.getElementById('MGD-NEW').value.trim().toUpperCase();
+  var msg = document.getElementById('MGD-MSG');
+  if(!val){ msg.textContent='Escribe el nombre del despacho'; return; }
+  if(DESPS.indexOf(val)>=0){ msg.textContent='Este despacho ya existe'; return; }
+  DESPS.push(val);
+  DESPS.sort();
+  saveDespachos();
+  document.getElementById('MGD-NEW').value='';
+  msg.style.color='var(--success)'; msg.textContent='Despacho "'+val+'" añadido correctamente';
+  renderDespachosList();
+  setTimeout(function(){msg.textContent='';},3000);
+}
+
+function saveDespachos(){
+  // Save to ST so it persists in Supabase
+  if(!ST['_config']) ST['_config'] = {records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+  ST['_config'].edits.despachos = DESPS.slice();
+  saveAll();
+}
+
+function loadDespachos(){
+  // Load custom despachos from ST if available
+  if(ST['_config'] && ST['_config'].edits && ST['_config'].edits.despachos){
+    var saved = ST['_config'].edits.despachos;
+    // Merge with defaults - add any new ones not already in list
+    saved.forEach(function(d){ if(DESPS.indexOf(d)<0) DESPS.push(d); });
+    DESPS.sort();
+  }
+}
+
+function openNuevoContrato(){
+  if(!cDni) return;
+  var emp=getEmp(cDni); if(!emp) return;
+  var es2=ges(cDni);
+  // Show current contract info
+  var tipoActual=getField(emp,es2,'tipo_contrato')||emp.tipo_contrato||'-';
+  var inicioActual=fd(getField(emp,es2,'inicio')||emp.inicio);
+  var socActual=getField(emp,es2,'sociedad')||emp.sociedad||'-';
+  document.getElementById('MNC-anterior').textContent=
+    'Tipo '+tipoActual+' | Inicio: '+inicioActual+' | '+socActual;
+  // Pre-fill sociedad with current
+  var socSel=getField(emp,es2,'sociedad')||emp.sociedad||'';
+  var socEl=document.getElementById('MNC-sociedad');
+  for(var i=0;i<socEl.options.length;i++){
+    if(socEl.options[i].value===socSel){socEl.selectedIndex=i;break;}
+  }
+  buildDespachoOptions('MNC-despacho', getField(emp, ges(emp.dni), 'despacho')||emp.despacho||'');
+  document.getElementById('MNC-inicio').value='';
+  document.getElementById('MNC-tipo').value='100';
+  document.getElementById('MNC-jornada').value='';
+  document.getElementById('MNC-salario').value='';
+  document.getElementById('MNC-pp').value='';
+  document.getElementById('MNC-fin').value='';
+  document.getElementById('MNC-err').style.display='none';
+  document.getElementById('MNC').classList.add('open');
+}
+
+function saveNuevoContrato(){
+  if(!cDni) return;
+  var nuevoInicio=document.getElementById('MNC-inicio').value;
+  if(!nuevoInicio){
+    document.getElementById('MNC-err').textContent='La fecha de inicio es obligatoria';
+    document.getElementById('MNC-err').style.display='block'; return;
+  }
+  var emp=getEmp(cDni); var es2=ges(cDni);
+  // Archive current contract in historial_contratos
+  if(!es2.historial_contratos) es2.historial_contratos=[];
+  var contratoArchivado={
+    id: Date.now()+'',
+    tipo: getField(emp,es2,'tipo_contrato')||emp.tipo_contrato||'',
+    inicio: getField(emp,es2,'inicio')||emp.inicio||'',
+    fin: getField(emp,es2,'baja')||emp.baja||nuevoInicio,
+    sociedad: getField(emp,es2,'sociedad')||emp.sociedad||'',
+    despacho: getField(emp,es2,'despacho')||emp.despacho||'',
+    jornada: getField(emp,es2,'jornada')||emp.jornada||'',
+    salario: getField(emp,es2,'salario')||emp.salario||'',
+    archivado_el: new Date().toLocaleDateString('es-ES')
+  };
+  es2.historial_contratos.push(contratoArchivado);
+  // Set new contract data
+  if(!es2.edits) es2.edits={};
+  es2.edits.inicio=nuevoInicio;
+  es2.edits.tipo_contrato=document.getElementById('MNC-tipo').value;
+  es2.edits.sociedad=document.getElementById('MNC-sociedad').value;
+  es2.edits.despacho=document.getElementById('MNC-despacho').value;
+  var jornada=document.getElementById('MNC-jornada').value;
+  if(jornada) es2.edits.jornada=jornada;
+  var salario=document.getElementById('MNC-salario').value;
+  if(salario) es2.edits.salario=salario;
+  var pp=document.getElementById('MNC-pp').value;
+  if(pp) es2.edits.periodo_prueba_fin=pp;
+  var fin=document.getElementById('MNC-fin').value;
+  if(fin) es2.edits.fin_contrato=fin; else delete es2.edits.fin_contrato;
+  // Clear baja and reset estado
+  delete es2.edits.baja;
+  delete es2.edits.estado;
+  // Register in historial
+  es2.historial.push({
+    id:Date.now()+'',fecha:new Date().toLocaleDateString('es-ES'),
+    campo:'Nuevo contrato',anterior:contratoArchivado.tipo+' ('+fd(contratoArchivado.inicio)+')',
+    nuevo:es2.edits.tipo_contrato+' desde '+fd(nuevoInicio),usuario:USER
+  });
+  closeModal('MNC');
+  saveAll();
+  renderDetail(emp);
+  renderList();
+}
+
+function piDate(d) {
+  if (!d) return '';
+  d = d.trim().replace(/-/g,'/');
+  var p = d.split('/');
+  if (p.length !== 3) return '';
+  if (p[2].length === 4) {
+    return p[2] + '-' + p[1].padStart(2,'0') + '-' + p[0].padStart(2,'0');
+  }
+  if (p[0].length === 4) {
+    return p[0] + '-' + p[1].padStart(2,'0') + '-' + p[2].padStart(2,'0');
+  }
+  return '';
+}
+
+function findByName(name) {
+  var n = name.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/  +/g,' ').trim();
+  for (var i=0;i<EMPS_BASE.length;i++) {
+    var en = EMPS_BASE[i].nombre.toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/  +/g,' ').trim();
+    if (en === n) return EMPS_BASE[i].dni;
+  }
+  // Fuzzy: 2+ word matches
+  var nw = n.split(' ').filter(function(w){return w.length>2;});
+  var best=0, bestDni=null;
+  for (var i=0;i<EMPS_BASE.length;i++) {
+    var ew = EMPS_BASE[i].nombre.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(' ').filter(function(w){return w.length>2;});
+    var sc = nw.filter(function(w){return ew.indexOf(w)>=0;}).length;
+    if (sc>=2 && sc>best) { best=sc; bestDni=EMPS_BASE[i].dni; }
+  }
+  return bestDni;
+}
+
+function doImport() {
+  var raw = document.getElementById('IMP-DATA').value.trim();
+  var res = document.getElementById('IMP-RES');
+  var det = document.getElementById('IMP-DETAIL');
+  if (!raw) { res.textContent='Pega los datos primero'; return; }
+
+  var lines = raw.split('\n');
+  var ok=0, skip=0, errs=[];
+  var hoyAno = new Date().getFullYear();
+
+  // Skip header row (first line)
+  var startIdx = 0;
+  var firstLine = lines[0].split('\t');
+  if(firstLine[0] && isNaN(firstLine[0].trim()) &&
+     (firstLine[0].toUpperCase().indexOf('DNI')>=0 ||
+      firstLine[0].toUpperCase().indexOf('NIF')>=0 ||
+      firstLine[0].toUpperCase().indexOf('EMPLEADO')>=0 ||
+      firstLine[0].toUpperCase().indexOf('NOMBRE')>=0)) {
+    startIdx = 1;
+  }
+
+  lines.slice(startIdx).forEach(function(line) {
+    var p = line.split('\t').map(function(x){return x.trim();});
+    if(p.length < 3 || !p[0]) { skip++; return; }
+
+    var dni = p[0].toUpperCase().replace(/[^A-Z0-9]/g,'');
+    var f1raw = p[1], f2raw = p[2];
+    var diasManual = p[3] ? parseFloat(p[3]) : null;
+    var anoManual = p[4] ? parseInt(p[4]) : null;
+
+    if(!dni || !f1raw || !f2raw) { skip++; errs.push('Fila sin datos: '+line.substring(0,30)); return; }
+
+    // Parse dates dd/mm/yyyy or yyyy-mm-dd
+    function parseDate(s) {
+      s = s.replace(/-/g,'/');
+      var pp = s.split('/');
+      if(pp.length!==3) return null;
+      if(pp[2].length===4) return pp[2]+'-'+pp[1].padStart(2,'0')+'-'+pp[0].padStart(2,'0');
+      if(pp[0].length===4) return pp[0]+'-'+pp[1].padStart(2,'0')+'-'+pp[2].padStart(2,'0');
+      return null;
+    }
+    var f1 = parseDate(f1raw), f2 = parseDate(f2raw);
+    if(!f1||!f2) { skip++; errs.push('Fecha invalida para DNI '+dni); return; }
+
+    // Find employee by DNI
+    var emp = null;
+    for(var i=0;i<EMPS_BASE.length;i++){
+      if(EMPS_BASE[i].dni.toUpperCase().replace(/[^A-Z0-9]/g,'')===dni){emp=EMPS_BASE[i];break;}
+    }
+    if(!emp && ST['_extra'] && ST['_extra'].extra_emps){
+      for(var j=0;j<ST['_extra'].extra_emps.length;j++){
+        if(ST['_extra'].extra_emps[j].dni.toUpperCase().replace(/[^A-Z0-9]/g,'')===dni){emp=ST['_extra'].extra_emps[j];break;}
+      }
+    }
+    if(!emp) { skip++; errs.push('DNI no encontrado: '+dni); return; }
+
+    // Check duplicate
+    var es2 = ges(emp.dni);
+    var dup = (es2.records||[]).some(function(r){return r.tipo==='vacaciones'&&r.f1===f1&&r.f2===f2;});
+    if(dup) { skip++; errs.push('Duplicado: '+emp.nombre+' '+fd(f1)); return; }
+
+    // Calculate days
+    var soc = (es2.edits&&es2.edits.sociedad)||emp.sociedad||'';
+    var educar = isEducar(soc);
+    var diasCalc = diasManual!==null ? diasManual : (educar ? diasNaturales(f1,f2) : diasLaborables(f1,f2));
+
+    // Determine year of accrual
+    var anoDevengo = anoManual || hoyAno;
+    // If no manual year, use year of f1
+    if(!anoManual) anoDevengo = parseInt(f1.substring(0,4));
+
+    // Check balance and auto-split if needed
+    var vacBal = calcVacaciones(emp, anoDevengo);
+    var pendiente = vacBal ? vacBal.pendientes : 999;
+
+    if(diasCalc > pendiente && pendiente >= 0 && !anoManual) {
+      // Auto-split between years
+      var dias1 = Math.round(pendiente*10)/10;
+      var dias2 = Math.round((diasCalc-dias1)*10)/10;
+      if(dias1 > 0) {
+        es2.records.push({id:'imp_'+Date.now()+'_a_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
+          dias:''+dias1,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+      }
+      if(dias2 > 0) {
+        es2.records.push({id:'imp_'+Date.now()+'_b_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
+          dias:''+dias2,estado:'aprobado',obs:'Importado (exceso '+(anoDevengo+1)+')',ano_devengo:''+(anoDevengo+1)});
+      }
+      errs.push('&#9888; '+emp.nombre+': '+diasCalc+' dias repartidos ('+dias1+' en '+anoDevengo+' + '+dias2+' en '+(anoDevengo+1)+')');
+    } else {
+      es2.records.push({id:'imp_'+Date.now()+'_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
+        dias:''+diasCalc,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+    }
+    ok++;
+  });
+
+  saveAll();
+
+  // Show results
+  if(ok>0){
+    res.style.background='rgba(63,185,80,.1)';res.style.color='var(--success)';
+    res.innerHTML='&#10003; '+ok+' registros importados correctamente'+(skip?' ('+skip+' omitidos)':'');
+  } else {
+    res.style.background='rgba(248,81,73,.1)';res.style.color='var(--dg)';
+    res.innerHTML='&#10007; No se importo ningun registro. '+skip+' omitidos.';
+  }
+  det.innerHTML = errs.map(function(e){return '<div>'+e+'</div>';}).join('');
+}
+</script>
+
+
+<div class="mo" id="MNE">
+  <div class="md" style="width:560px">
+    <h3>&#128100; Nuevo empleado</h3>
+    <div class="fr2">
+      <div class="fg"><label>Nombre completo *</label><input type="text" id="NE-nombre" placeholder="APELLIDOS, Nombre"></div>
+      <div class="fg"><label>DNI / NIE *</label><input type="text" id="NE-dni" placeholder="12345678A"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Sociedad *</label>
+        <select id="NE-sociedad">
+          <option value="">-- Selecciona --</option>
+          <option>ASCENT LEGAL STRATEGIES SOCIEDAD LIM</option>
+          <option>ASESORÍA BOWIE, S.L</option>
+          <option>CENTRO DE FORMACION EDUCAR SIN FRONTERAS</option>
+          <option>DESKO HISPANOAMERICANA CORPORATION S</option>
+          <option>QUANTUM LEGAL SERVICES, SOCIEDAD LIM</option>
+        </select>
+      </div>
+      <div class="fg"><label>Despacho</label>
+        <select id="NE-despacho">
+          <option value="">-- Selecciona --</option>
+          <!-- NE-despacho options -->
+        </select>
+      </div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Puesto</label><input type="text" id="NE-puesto"></div>
+      <div class="fg"><label>Categoria</label><input type="text" id="NE-categoria"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>F. Incorporacion *</label><input type="date" id="NE-inicio"></div>
+      <div class="fg"><label>Tipo contrato</label>
+        <select id="NE-contrato">
+          <option value="100">100 - Indefinido tiempo completo</option>
+          <option value="200">200 - Indefinido tiempo parcial</option>
+          <option value="300">300 - Fijo-discontinuo</option>
+          <option value="33">33 - Practicas profesionales</option>
+          <option value="44">44 - Formacion en alternancia</option>
+          <option value="402">402 - Temporal produccion t.completo</option>
+          <option value="502">502 - Temporal produccion t.parcial</option>
+          <option value="410">410 - Sustitucion t.completo</option>
+          <option value="510">510 - Sustitucion t.parcial</option>
+        </select>
+      </div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>% Jornada</label><input type="number" id="NE-jornada" placeholder="100" min="0" max="100"></div>
+      <div class="fg"><label>Salario bruto/ano</label><input type="number" id="NE-salario" placeholder="18000"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>F. Nacimiento</label><input type="date" id="NE-nacimiento"></div>
+      <div class="fg"><label>Caducidad doc. (NIE/Pasaporte)</label><input type="date" id="NE-caducidad"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Email</label><input type="email" id="NE-email"></div>
+      <div class="fg"><label>Telefono</label><input type="text" id="NE-telefono"></div>
+    </div>
+    <div class="fr2">
+      <div class="fg"><label>Estado</label>
+        <select id="NE-estado">
+          <option value="ACTIVO">ACTIVO</option>
+          <option value="BAJA">BAJA</option>
+          <option value="IT">IT</option>
+          <option value="EXCEDENCIA">EXCEDENCIA</option>
+        </select>
+      </div>
+      <div class="fg"><label>Responsable</label><input type="text" id="NE-responsable"></div>
+    </div>
+    <div id="NE-err" style="color:var(--dg);font-size:.75rem;display:none;margin:.3rem 0"></div>
+    <div class="ma">
+      <button class="btn btn-o" onclick="closeModal('MNE')">Cancelar</button>
+      <button class="btn btn-r" onclick="saveNewEmp()">Crear empleado</button>
+    </div>
+  </div>
+</div>
+<script>
+function openNewEmp() {
+  // Clear form
+  ['NE-nombre','NE-dni','NE-puesto','NE-categoria','NE-email','NE-telefono','NE-responsable','NE-salario','NE-jornada','NE-nacimiento','NE-caducidad'].forEach(function(id){
+    var el=document.getElementById(id); if(el) el.value='';
+  });
+  document.getElementById('NE-sociedad').value='';
+  buildDespachoOptions('NE-despacho','');
+  document.getElementById('NE-estado').value='ACTIVO';
+  document.getElementById('NE-contrato').value='100';
+  document.getElementById('NE-inicio').value='';
+  document.getElementById('NE-err').style.display='none';
+  document.getElementById('MNE').classList.add('open');
+}
+
+function saveNewEmp() {
+  var nombre  = document.getElementById('NE-nombre').value.trim();
+  var dni     = document.getElementById('NE-dni').value.trim().toUpperCase();
+  var sociedad= document.getElementById('NE-sociedad').value;
+  var inicio  = document.getElementById('NE-inicio').value;
+  var errEl   = document.getElementById('NE-err');
+
+  // Validations
+  if (!nombre || !dni || !sociedad || !inicio) {
+    errEl.textContent = 'Nombre, DNI, Sociedad y Fecha de incorporacion son obligatorios.';
+    errEl.style.display = 'block'; return;
+  }
+  // Check duplicate DNI
+  var exists = EMPS_BASE.some(function(e){ return e.dni.toUpperCase() === dni; });
+  var existsExtra = EXTRA_EMPS.some(function(e){ return e.dni.toUpperCase() === dni; });
+  if (exists || existsExtra) {
+    errEl.textContent = 'Ya existe un empleado con ese DNI.';
+    errEl.style.display = 'block'; return;
+  }
+
+  // ROBUST consecutive number generation
+  var SOC_PFX_MAP = {'ASCENT LEGAL STRATEGIES SOCIEDAD LIM':1,'ASESORÍA BOWIE, S.L':2,
+    'CENTRO DE FORMACION EDUCAR SIN FRONTERAS':3,'DESKO HISPANOAMERICANA CORPORATION S':4,
+    'QUANTUM LEGAL SERVICES, SOCIEDAD LIM':5};
+  var pfx = SOC_PFX_MAP[sociedad] || 0;
+  var archivo = getNextArchivo(sociedad, pfx, null);
+
+  var jornada = document.getElementById('NE-jornada').value || '100';
+  var horas = Math.round(parseFloat(jornada)/100*40*100)/100;
+
+  var newEmp = {
+    archivo: archivo,
+    sociedad: sociedad,
+    dni: dni,
+    nombre: nombre,
+    email: document.getElementById('NE-email').value.trim(),
+    despacho: document.getElementById('NE-despacho').value,
+    categoria: document.getElementById('NE-categoria').value.trim(),
+    puesto: document.getElementById('NE-puesto').value.trim(),
+    nacimiento: document.getElementById('NE-nacimiento').value||'',
+    inicio: inicio,
+    baja: '',
+    motivo_baja: '',
+    jornada: jornada,
+    tipo_contrato: document.getElementById('NE-contrato').value,
+    salario: document.getElementById('NE-salario').value,
+    cuenta: '',
+    caducidad_doc: document.getElementById('NE-caducidad').value||'',
+    estado: document.getElementById('NE-estado').value,
+    horas: horas + '',
+    telefono: document.getElementById('NE-telefono').value.trim(),
+    responsable: document.getElementById('NE-responsable').value.trim(),
+    salario_mensual: '',
+    grupo_profesional: '',
+    periodo_prueba_fin: '',
+    fin_contrato: '',
+    _nuevo: true
+  };
+
+  EXTRA_EMPS.push(newEmp);
+  EMPS_BASE.push(newEmp);
+
+  // Save extra employees list to state
+  if (!ST['_extra']) ST['_extra'] = {records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+  // se AÑADE a la lista compartida; nunca se sustituye la lista entera
+  ST['_extra'].extra_emps = unionExtras(ST['_extra'].extra_emps||[], [JSON.parse(JSON.stringify(newEmp))]);
+
+  closeModal('MNE');
+  saveAll();
+  renderList();
+  updStats();
+  buildAlerts();
+  selEmp(dni);
+}
+</script>
+</body>
+</html>
