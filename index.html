@@ -602,13 +602,16 @@ function mergePreloaded(fillOnly) {
 var cDni = null;
 var cF = 'ALL';
 var cTab = 'datos';
+var cSubTab = 'vac-tab';   // sub-pestaña abierta en Vacaciones y absentismo
+var editRecId = null;      // registro que se esta editando (null = registro nuevo)
+var _mrWasEdit = false;
 var editField = null;
 var editOldVal = null;
 
 // ============================================================
 // INIT
 // ============================================================
-var PORTAL_VERSION = 'v3.0';
+var PORTAL_VERSION = 'v3.2';
 var LSK_PEND = 'da_rrhh_pending';
 var _snap = {};            // ultimo estado visto en Supabase, por clave (JSON)
 var _remoteLoaded = false; // ya se ha leido Supabase en esta sesion
@@ -1355,7 +1358,39 @@ function diasNaturales(f1, f2){
   return Math.round((d2-d1)/86400000)+1;
 }
 
-function calcVacaciones(emp,ano){
+// Dias de cierre de empresa: todos los empleados los tienen como vacaciones cada año, sin registrarlos uno a uno
+var DIAS_CIERRE = ['12-24','12-31'];   // mes-dia
+var DIAS_CIERRE_DESDE = 2026;          // primer año en que se aplican
+function isoDe(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+// ¿Hay ya un periodo de vacaciones (aprobado o disfrutado) que incluye ese dia?
+function vacCubre(es2, iso){
+  return (es2.records||[]).some(function(r){
+    if(r.tipo!=='vacaciones' || !r.f1) return false;
+    if(r.estado!=='aprobado' && r.estado!=='disfrutado') return false;
+    var a=fiso(r.f1), b=fiso(r.f2||r.f1)||a;
+    return a<=iso && iso<=b;
+  });
+}
+// Dias de cierre que hay que descontar a este empleado en ese año (los que NO tiene ya dentro de un periodo)
+function diasCierreAuto(emp, ano, rango){
+  var out=[];
+  if(!ano || ano<DIAS_CIERRE_DESDE || ano>new Date().getFullYear()) return out;
+  var es2=ges(emp.dni);
+  var inicio=fiso(getField(emp,es2,'inicio'));
+  var baja=fiso(getField(emp,es2,'baja')||emp.baja);
+  var educar=isEducar(getField(emp,es2,'sociedad')||emp.sociedad||'');
+  DIAS_CIERRE.forEach(function(md){
+    var iso=ano+'-'+md;
+    if(inicio && inicio>iso) return;                        // todavia no habia entrado
+    if(baja && baja<iso) return;                            // ya habia causado baja
+    if(rango && rango[0]<=iso && iso<=rango[1]) return;     // el periodo que se esta guardando ya lo incluye
+    if(vacCubre(es2, iso)) return;                          // ya lo tiene dentro de un periodo: no se cuenta dos veces
+    var d=educar?1:diasLaborables(iso,iso);
+    if(d>0) out.push({f:iso,d:d});
+  });
+  return out;
+}
+function calcVacaciones(emp,ano,rango){
   var es2=ges(emp.dni);
   var inicio=fiso(getField(emp,es2,'inicio'));
   var baja=fiso(getField(emp,es2,'baja')||emp.baja);
@@ -1391,9 +1426,12 @@ function calcVacaciones(emp,ano){
       disfrutadas += d;
     }
   });
+  // 24 y 31 de diciembre: se descuentan a todos, salvo que ya esten dentro de un periodo suyo
+  var cierre=diasCierreAuto(emp, anoActual, rango);
+  cierre.forEach(function(x){ disfrutadas += x.d; });
   var pendientes=Math.max(0,dias-disfrutadas);
   var solicitadas=recs.filter(function(r){return r.estado==='solicitado';}).length;
-  return{generadas:dias,disfrutadas:Math.round(disfrutadas*10)/10,
+  return{cierre:cierre,generadas:dias,disfrutadas:Math.round(disfrutadas*10)/10,
     pendientes:Math.round(pendientes*10)/10,solicitadas:solicitadas,
     tipo:educar?'naturales':'laborables',diasAno:diasAno};
 }
@@ -1563,7 +1601,7 @@ function selEmpByArchivo(archivo) {
 
 function selEmp(dni, archivo){
   // Support disambiguation by archivo when same DNI has multiple entries
-  cDni=dni; cTab='datos'; renderList();
+  cDni=dni; cTab='datos'; cSubTab='vac-tab'; renderList();
   var emp = null;
   if(archivo) {
     for(var i=0;i<EMPS_BASE.length;i++) {
@@ -1814,8 +1852,9 @@ function buildVacaciones(emp,es2,c){
   // Section tabs: Vacaciones | Absentismo
   var stabs=document.createElement('div'); stabs.className='section-tabs';
   [['vac-tab','Vacaciones'],['abs-tab','Absentismo']].forEach(function(t,i){
-    var st=document.createElement('div'); st.className='stab'+(i===0?' on':''); st.textContent=t[1];
+    var st=document.createElement('div'); st.className='stab'+(t[0]===cSubTab?' on':''); st.textContent=t[1];
     st.addEventListener('click',(function(id,el){return function(){
+      cSubTab=id;
       document.querySelectorAll('.stab').forEach(function(x){x.classList.remove('on');}); el.classList.add('on');
       document.getElementById('vac-section').style.display=id==='vac-tab'?'block':'none';
       document.getElementById('abs-section').style.display=id==='abs-tab'?'block':'none';
@@ -1825,13 +1864,17 @@ function buildVacaciones(emp,es2,c){
   c.appendChild(stabs);
 
   // VAC SECTION
-  var vSec=document.createElement('div'); vSec.id='vac-section';
+  var vSec=document.createElement('div'); vSec.id='vac-section'; if(cSubTab==='abs-tab') vSec.style.display='none';
   var vacRecs=(es2.records||[]).filter(function(r){return r.tipo==='vacaciones';});
   var vHead=document.createElement('div'); vHead.className='shead';
   var vTitle=document.createElement('div'); vTitle.className='stitle'; vTitle.innerHTML='&#127958; Periodos de vacaciones';
   var vBtn=document.createElement('button'); vBtn.className='btn btn-r btn-sm'; vBtn.textContent='+ Solicitar';
   vBtn.onclick=function(){ document.getElementById('RT').value='vacaciones'; openModal('MR'); };
   vHead.appendChild(vTitle); vHead.appendChild(vBtn); vSec.appendChild(vHead);
+  diasCierreAuto(emp, new Date().getFullYear()).forEach(function(x){
+    vacRecs.push({_auto:true,id:'auto_'+x.f,tipo:'vacaciones',f1:x.f,f2:x.f,dias:''+x.d,estado:'aprobado',
+      obs:'Automatico: cierre de empresa (24 y 31 de diciembre). Se descuenta del saldo.',ano_devengo:x.f.substring(0,4)});
+  });
   if(!vacRecs.length){
     var emp2=document.createElement('div'); emp2.className='empty-s'; emp2.textContent='Sin periodos de vacaciones registrados'; vSec.appendChild(emp2);
   } else {
@@ -1842,7 +1885,7 @@ function buildVacaciones(emp,es2,c){
   c.appendChild(vSec);
 
   // ABS SECTION
-  var aSec=document.createElement('div'); aSec.id='abs-section'; aSec.style.display='none';
+  var aSec=document.createElement('div'); aSec.id='abs-section'; if(cSubTab!=='abs-tab') aSec.style.display='none';
   var absRecs=(es2.records||[]).filter(function(r){return r.tipo!=='vacaciones';});
   var aHead=document.createElement('div'); aHead.className='shead';
   var aTitle=document.createElement('div'); aTitle.className='stitle'; aTitle.innerHTML='&#128197; Absentismo y permisos';
@@ -1879,9 +1922,12 @@ function buildRecItem(r,dni){
   body.appendChild(tit); body.appendChild(dates);
   if(r.obs){var rn=document.createElement('div'); rn.className='rec-note'; rn.textContent=r.obs; body.appendChild(rn);}
   var acts=document.createElement('div'); acts.className='rec-actions';
+  var edt=document.createElement('button'); edt.className='btn btn-o btn-xs'; edt.textContent='Editar';
+  edt.onclick=(function(id,d){return function(){openEditRec(id,d);};})(r.id,dni);
   var del=document.createElement('button'); del.className='btn btn-o btn-xs'; del.textContent='Borrar';
   del.onclick=(function(id,d){return function(){delRec(id,d);};})(r.id,dni);
-  acts.appendChild(del); div.appendChild(dot); div.appendChild(body); div.appendChild(acts);
+  if(!r._auto){ acts.appendChild(edt); acts.appendChild(del); }   // los dias automaticos no son registros: no se editan ni se borran
+  div.appendChild(dot); div.appendChild(body); div.appendChild(acts);
   return div;
 }
 
@@ -2048,6 +2094,16 @@ function saveEdit(){
 function openModal(id){
   document.getElementById(id).classList.add('open');
   if(id==='MR'){
+    // Por defecto es un registro NUEVO; openEditRec lo cambia despues a modo edicion
+    editRecId = null;
+    document.getElementById('MR-title').textContent = 'Nuevo registro';
+    if(_mrWasEdit){
+      // el formulario venia de una edicion: se limpia para no arrastrar sus datos a un registro nuevo
+      _mrWasEdit = false;
+      document.getElementById('RF1').value=''; document.getElementById('RF2').value='';
+      document.getElementById('RD').value=''; document.getElementById('ROBS').value='';
+      document.getElementById('REST').value = document.getElementById('RT').value==='vacaciones' ? 'solicitado' : 'aprobado';
+    }
     // Always set default year correctly
     var hoyAno = new Date().getFullYear();
     document.getElementById('RANO').value = ''+hoyAno;
@@ -2058,13 +2114,48 @@ function openModal(id){
 }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 
+function setSelectValue(id,val,label){
+  // si el valor guardado no esta entre las opciones (p. ej. un año antiguo), se añade para no perderlo
+  var sel=document.getElementById(id); if(!sel) return;
+  var ok=false;
+  for(var i=0;i<sel.options.length;i++){ if(sel.options[i].value===val){ ok=true; break; } }
+  if(!ok && val!==''){ var o=document.createElement('option'); o.value=val; o.textContent=label||val; sel.appendChild(o); }
+  sel.value=val;
+}
+function recResumen(r){
+  return (r.tipo||'').replace(/-/g,' ')+' '+fd(r.f1)+(r.f2&&r.f2!==r.f1?' al '+fd(r.f2):'')+' ('+(r.dias||0)+' dias) '+(r.estado||'')+
+    (r.tipo==='vacaciones'&&r.ano_devengo?' ['+r.ano_devengo+']':'');
+}
+// Abre el mismo formulario de "Nuevo registro", pero cargado con un registro existente
+function openEditRec(id,dni){
+  var es2=ges(dni);
+  var r=null; (es2.records||[]).forEach(function(x){ if(x.id===id) r=x; });
+  if(!r){ alert('Este registro ya no existe. Puede haberlo borrado otra persona.'); var e0=getEmp(dni); if(e0) renderDetail(e0); return; }
+  setSelectValue('RT', r.tipo||'otros');
+  openModal('MR');
+  editRecId=id; _mrWasEdit=true;
+  document.getElementById('MR-title').textContent='Editar registro';
+  document.getElementById('RF1').value=fiso(r.f1||'');
+  document.getElementById('RF2').value=fiso(r.f2||r.f1||'');
+  document.getElementById('RD').value=(r.dias!==undefined&&r.dias!==null)?r.dias:'';
+  setSelectValue('REST', r.estado||'aprobado');
+  document.getElementById('ROBS').value=r.obs||'';
+  var isVac=r.tipo==='vacaciones';
+  document.getElementById('fg-ano-dev').style.display=isVac?'block':'none';
+  if(isVac){
+    var ano=r.ano_devengo?(''+r.ano_devengo):(r.f1||'').substring(0,4);
+    if(ano) setSelectValue('RANO', ano);
+  }
+}
+
 function updMR(){
   var t=document.getElementById('RT').value;
   var isVac=t==='vacaciones';
   document.getElementById('LF1').textContent=isVac?'Fecha inicio':'Fecha inicio';
   document.getElementById('LF2').textContent=isVac?'Fecha fin':'Fecha fin';
-  document.getElementById('REST').value=isVac?'solicitado':'aprobado';
+  if(!editRecId) document.getElementById('REST').value=isVac?'solicitado':'aprobado';   // al editar no se pisa el estado guardado
   document.getElementById('fg-ano-dev').style.display=isVac?'block':'none';
+  if(isVac && editRecId) return autoCalcDias();   // al editar se respeta el año de devengo elegido
   if(isVac){
     var hoy=new Date();
     document.getElementById('RANO').value=''+hoy.getFullYear();
@@ -2111,11 +2202,48 @@ function saveRec(){
   var obsVal = document.getElementById('ROBS').value.trim();
   var diasFinal = parseFloat(diasInput||''+diasCalc) || 0;
 
+  if(editRecId){
+    // ---- EDICION de un registro existente: se actualiza el mismo registro (mismo id) ----
+    var recs=es2.records||[], rec=null, pos=-1;
+    for(var ri=0;ri<recs.length;ri++){ if(recs[ri].id===editRecId){ rec=recs[ri]; pos=ri; break; } }
+    if(!rec){
+      alert('Este registro ya no existe. Puede haberlo borrado otra persona. No se ha guardado nada.');
+      closeModal('MR'); editRecId=null; if(emp) renderDetail(emp); return;
+    }
+    var anoEd='';
+    if(tipo==='vacaciones'){
+      anoEd=''+parseInt(document.getElementById('RANO').value||''+new Date().getFullYear());
+      // saldo del año sin contar este mismo registro
+      recs.splice(pos,1);
+      var vEd=calcVacaciones(emp, parseInt(anoEd), [f1,f2]);
+      recs.splice(pos,0,rec);
+      var cuenta=(estadoVal==='aprobado'||estadoVal==='disfrutado');
+      if(cuenta && vEd && diasFinal>vEd.pendientes){
+        if(!confirm('Con este cambio el periodo ('+diasFinal+' dias) supera el saldo pendiente de '+anoEd+' ('+vEd.pendientes+' dias).\n\nAl editar no se reparte automaticamente entre dos años. ¿Guardar igualmente?')) return;
+      }
+    }
+    var antes=recResumen(rec);
+    rec.tipo=tipo; rec.f1=f1; rec.f2=f2; rec.dias=''+diasFinal; rec.estado=estadoVal; rec.obs=obsVal; rec.ano_devengo=anoEd;
+    var despues=recResumen(rec);
+    if(antes!==despues){
+      if(!es2.historial) es2.historial=[];
+      es2.historial.push({id:Date.now()+'',fecha:new Date().toLocaleDateString('es-ES'),campo:'Registro editado',anterior:antes,nuevo:despues,usuario:USER});
+    }
+    editRecId=null;
+    closeModal('MR');
+    document.getElementById('RF1').value=''; document.getElementById('RF2').value='';
+    document.getElementById('RD').value=''; document.getElementById('ROBS').value='';
+    _mrWasEdit=false;
+    saveAll();
+    if(emp) renderDetail(emp);
+    return;
+  }
+
   if(tipo==='vacaciones'){
     var anoDevengo = parseInt(document.getElementById('RANO').value||''+new Date().getFullYear());
     // Check remaining balance for selected year
     var empTmp = getEmp(cDni);
-    var vacTmp = empTmp ? calcVacaciones(empTmp, anoDevengo) : null;
+    var vacTmp = empTmp ? calcVacaciones(empTmp, anoDevengo, [f1,f2]) : null;
     var pendienteAno = vacTmp ? vacTmp.pendientes : 999;
 
     if(diasFinal > pendienteAno && pendienteAno >= 0){
@@ -2374,7 +2502,8 @@ function runReport(tipo){
     </p>
     <div style="background:rgba(56,139,253,.08);border:1px solid rgba(56,139,253,.2);border-radius:5px;padding:.5rem .75rem;font-size:.72rem;color:var(--bl);margin-bottom:.65rem">
       &#128161; Si no pones días, los calcula automáticamente (laborables para todas las sociedades excepto Educar que usa naturales).<br>
-      &#128161; Si no pones año de devengo, lo asigna según el saldo disponible — el exceso pasa automáticamente a 2027.
+      &#128161; Si no pones año de devengo, lo asigna según el saldo disponible — el exceso pasa automáticamente a 2027.<br>
+      &#128161; Los días que ya estén en el portal no se duplican: se omiten, y si un periodo coincide solo en parte se añaden únicamente los días que faltan.
     </div>
     <div class="fg"><label>Pegar datos desde Excel (Tab-separado)</label>
       <textarea id="IMP-DATA" rows="8" style="font-family:monospace;font-size:.71rem" placeholder="DNI&#9;FECHA INICIO&#9;FECHA FIN&#9;DIAS&#9;AÑO DEVENGO&#10;12345678A&#9;01/07/2026&#9;15/07/2026&#9;&#9;&#10;Z1234567B&#9;01/08/2026&#9;15/08/2026&#9;11&#9;2026"></textarea>
@@ -2562,7 +2691,7 @@ function doImport() {
   if (!raw) { res.textContent='Pega los datos primero'; return; }
 
   var lines = raw.split('\n');
-  var ok=0, skip=0, errs=[];
+  var ok=0, skip=0, ya=0, seq=0, errs=[];
   var hoyAno = new Date().getFullYear();
 
   // Skip header row (first line)
@@ -2611,56 +2740,98 @@ function doImport() {
     }
     if(!emp) { skip++; errs.push('DNI no encontrado: '+dni); return; }
 
-    // Check duplicate
     var es2 = ges(emp.dni);
-    var dup = (es2.records||[]).some(function(r){return r.tipo==='vacaciones'&&r.f1===f1&&r.f2===f2;});
-    if(dup) { skip++; errs.push('Duplicado: '+emp.nombre+' '+fd(f1)); return; }
-
-    // Calculate days
+    if(f2 < f1){ skip++; errs.push('Fecha fin anterior a la de inicio: '+emp.nombre+' '+fd(f1)); return; }
+    if(diasNaturales(f1,f2) > 366){ skip++; errs.push('Periodo de mas de un año: '+emp.nombre+' '+fd(f1)); return; }
     var soc = (es2.edits&&es2.edits.sociedad)||emp.sociedad||'';
     var educar = isEducar(soc);
-    var diasCalc = diasManual!==null ? diasManual : (educar ? diasNaturales(f1,f2) : diasLaborables(f1,f2));
+    var cuenta = function(a,b){ return educar ? diasNaturales(a,b) : diasLaborables(a,b); };
+    var txt = function(a,b){ return fd(a)+(b!==a?' al '+fd(b):''); };
 
-    // Determine year of accrual
-    var anoDevengo = anoManual || hoyAno;
-    // If no manual year, use year of f1
-    if(!anoManual) anoDevengo = parseInt(f1.substring(0,4));
-
-    // Check balance and auto-split if needed
-    var vacBal = calcVacaciones(emp, anoDevengo);
-    var pendiente = vacBal ? vacBal.pendientes : 999;
-
-    if(diasCalc > pendiente && pendiente >= 0 && !anoManual) {
-      // Auto-split between years
-      var dias1 = Math.round(pendiente*10)/10;
-      var dias2 = Math.round((diasCalc-dias1)*10)/10;
-      if(dias1 > 0) {
-        es2.records.push({id:'imp_'+Date.now()+'_a_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
-          dias:''+dias1,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+    // Dias de ese periodo que YA estan en el portal como vacaciones (en cualquier periodo no rechazado)
+    var ocupado = {};
+    (es2.records||[]).forEach(function(r){
+      if(r.tipo!=='vacaciones' || r.estado==='rechazado' || !r.f1) return;
+      var ra=fiso(r.f1), rb=fiso(r.f2||r.f1)||ra;
+      if(!ra || rb<f1 || ra>f2) return;
+      var dd=parseFecha(ra<f1?f1:ra), fin=parseFecha(rb>f2?f2:rb);
+      while(dd<=fin){ ocupado[isoDe(dd)]=1; dd.setDate(dd.getDate()+1); }
+    });
+    var yaDias = Object.keys(ocupado).length;
+    var tramos = [[f1,f2]];
+    if(yaDias > 0){
+      // se importan solo los dias que faltan, en uno o varios tramos
+      tramos = []; var cur=null, d0=parseFecha(f1), d1=parseFecha(f2);
+      while(d0<=d1){
+        var iso=isoDe(d0);
+        if(ocupado[iso]){ if(cur){ tramos.push(cur); cur=null; } }
+        else { if(!cur) cur=[iso,iso]; else cur[1]=iso; }
+        d0.setDate(d0.getDate()+1);
       }
-      if(dias2 > 0) {
-        es2.records.push({id:'imp_'+Date.now()+'_b_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
-          dias:''+dias2,estado:'aprobado',obs:'Importado (exceso '+(anoDevengo+1)+')',ano_devengo:''+(anoDevengo+1)});
+      if(cur) tramos.push(cur);
+      tramos = tramos.filter(function(t){ return cuenta(t[0],t[1]) > 0; });   // un tramo que solo es fin de semana no aporta dias
+      tramos.forEach(function(t){
+        // se recortan los extremos que no cuentan (fines de semana o festivos pegados al periodo que ya existia)
+        var x=parseFecha(t[0]); while(cuenta(isoDe(x),isoDe(x))===0){ x.setDate(x.getDate()+1); } t[0]=isoDe(x);
+        var y=parseFecha(t[1]); while(cuenta(isoDe(y),isoDe(y))===0){ y.setDate(y.getDate()-1); } t[1]=isoDe(y);
+      });
+      if(!tramos.length){ skip++; ya++; errs.push('Ya estaba en el portal (no se duplica): '+emp.nombre+' '+txt(f1,f2)); return; }
+      if(diasManual!==null){
+        skip++; errs.push('&#9888; '+emp.nombre+' '+txt(f1,f2)+': coincide en parte con un periodo que ya esta y trae los dias puestos a mano. No se importa; corrigelo en su ficha con Editar.'); return;
       }
-      errs.push('&#9888; '+emp.nombre+': '+diasCalc+' dias repartidos ('+dias1+' en '+anoDevengo+' + '+dias2+' en '+(anoDevengo+1)+')');
-    } else {
-      es2.records.push({id:'imp_'+Date.now()+'_'+ok,tipo:'vacaciones',f1:f1,f2:f2,
-        dias:''+diasCalc,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+      errs.push('&#9888; '+emp.nombre+': '+txt(f1,f2)+' coincidia en parte con lo que ya habia. Solo se añade '+tramos.map(function(t){return txt(t[0],t[1]);}).join(' y '));
     }
+
+    tramos.forEach(function(t){
+      var tf1=t[0], tf2=t[1];
+      // Calculate days
+      var diasCalc = (diasManual!==null && yaDias===0) ? diasManual : cuenta(tf1,tf2);
+
+      // Determine year of accrual: manual, or the year of the start date
+      var anoDevengo = anoManual || parseInt(tf1.substring(0,4));
+
+      // Check balance and auto-split if needed
+      var vacBal = calcVacaciones(emp, anoDevengo, [tf1,tf2]);
+      var pendiente = vacBal ? vacBal.pendientes : 999;
+
+      if(diasCalc > pendiente && pendiente >= 0 && !anoManual) {
+        // Auto-split between years
+        var dias1 = Math.round(pendiente*10)/10;
+        var dias2 = Math.round((diasCalc-dias1)*10)/10;
+        if(dias1 > 0) {
+          es2.records.push({id:'imp_'+Date.now()+'_a_'+(seq++),tipo:'vacaciones',f1:tf1,f2:tf2,
+            dias:''+dias1,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+        }
+        if(dias2 > 0) {
+          es2.records.push({id:'imp_'+Date.now()+'_b_'+(seq++),tipo:'vacaciones',f1:tf1,f2:tf2,
+            dias:''+dias2,estado:'aprobado',obs:'Importado (exceso '+(anoDevengo+1)+')',ano_devengo:''+(anoDevengo+1)});
+        }
+        errs.push('&#9888; '+emp.nombre+': '+diasCalc+' dias repartidos ('+dias1+' en '+anoDevengo+' + '+dias2+' en '+(anoDevengo+1)+')');
+      } else {
+        es2.records.push({id:'imp_'+Date.now()+'_'+(seq++),tipo:'vacaciones',f1:tf1,f2:tf2,
+          dias:''+diasCalc,estado:'aprobado',obs:'Importado',ano_devengo:''+anoDevengo});
+      }
+    });
     ok++;
   });
 
-  saveAll();
+  if(ok>0) saveAll();
 
   // Show results
+  var otros = skip-ya;
+  var resumen = (ya?' &middot; '+ya+' ya estaban en el portal y no se duplican':'')+(otros?' &middot; '+otros+' omitidos por otro motivo':'');
   if(ok>0){
     res.style.background='rgba(63,185,80,.1)';res.style.color='var(--success)';
-    res.innerHTML='&#10003; '+ok+' registros importados correctamente'+(skip?' ('+skip+' omitidos)':'');
+    res.innerHTML='&#10003; '+ok+' periodos importados'+resumen;
+  } else if(ya>0 && !otros){
+    res.style.background='rgba(56,139,253,.08)';res.style.color='var(--bl)';
+    res.innerHTML='No habia nada nuevo: los '+ya+' periodos ya estaban en el portal.';
   } else {
     res.style.background='rgba(248,81,73,.1)';res.style.color='var(--dg)';
     res.innerHTML='&#10007; No se importo ningun registro. '+skip+' omitidos.';
   }
   det.innerHTML = errs.map(function(e){return '<div>'+e+'</div>';}).join('');
+  if(ok>0 && cDni){ var eSel=getEmp(cDni); if(eSel) renderDetail(eSel); renderList(); buildAlerts(); }
 }
 </script>
 
