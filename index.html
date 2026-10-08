@@ -446,6 +446,8 @@ if(storedVer && storedVer !== htmlVer){
       <div class="rep-card" onclick="genReport('cuentas')"><div class="rep-icon">&#127981;</div><div><div class="rep-name">Cuentas bancarias</div><div class="rep-desc">IBAN empleados activos</div></div></div>
       <div class="rep-card" onclick="genReport('caducidades')"><div class="rep-icon">&#128196;</div><div><div class="rep-name">Caducidad docs</div><div class="rep-desc">NIE/Pasaporte con alertas</div></div></div>
       <div class="rep-card" onclick="genReport('bbdd')"><div class="rep-icon">&#128203;</div><div><div class="rep-name">BBDD completa</div><div class="rep-desc">Todos los datos de empleados</div></div></div>
+      <div class="rep-card" onclick="genReport('consecutivos')"><div class="rep-icon">&#128290;</div><div><div class="rep-name">Consecutivos</div><div class="rep-desc">N&ordm; de registro por sociedad: huecos, repetidos y orden</div></div></div>
+      <div class="rep-card" onclick="closeModal('MREP');openReordenar()"><div class="rep-icon">&#128257;</div><div><div class="rep-name">Reordenar consecutivos</div><div class="rep-desc">Numerar cada sociedad desde el .0 por antig&uuml;edad</div></div></div>
       <div class="rep-card" onclick="genReport('historial')"><div class="rep-icon">&#128336;</div><div><div class="rep-name">Historial cambios</div><div class="rep-desc">Modificaciones registradas</div></div></div>
     </div>
     <div class="ma"><button class="btn btn-o" onclick="closeModal('MREP')">Cerrar</button></div>
@@ -478,7 +480,7 @@ function findRelatedContracts(dni, currentSoc) {
   // Find all employees with same DNI but different society
   var related = [];
   EMPS_BASE.forEach(function(e) {
-    if(e.dni === dni && e.sociedad !== currentSoc) {
+    if(dniReal(e) === dni && e.sociedad !== currentSoc) {
       var es2 = ges(e.dni + '_' + e.archivo) || ges(e.dni);
       var soc = getField(e, ges(e.dni), 'sociedad') || e.sociedad;
       if(soc !== currentSoc) {
@@ -487,6 +489,7 @@ function findRelatedContracts(dni, currentSoc) {
           estado: getEstado(e),
           inicio: getField(e, ges(e.dni), 'inicio') || e.inicio,
           archivo: e.archivo,
+          num: numReg(e),
           sociedad: soc
         });
       }
@@ -505,35 +508,337 @@ function socShort(s) {
   return s.substring(0,10);
 }
 
+// ---------- Nº de registro (consecutivo) ----------
+var SOC_PFX = {'ASCENT LEGAL STRATEGIES SOCIEDAD LIM':1,'ASESORÍA BOWIE, S.L':2,'ASESORIA BOWIE, S.L':2,
+  'CENTRO DE FORMACION EDUCAR SIN FRONTERAS':3,'DESKO HISPANOAMERICANA CORPORATION S':4,
+  'QUANTUM LEGAL SERVICES, SOCIEDAD LIM':5};
+// El numero con el que se creo la ficha (e.archivo) no se toca: identifica la ficha.
+// Si se cambia a mano, el numero nuevo se guarda aparte y es el que se ve en todas partes.
+function nregKey(e){ return 'nreg_'+e.archivo; }
+// Una persona puede tener una ficha en cada sociedad. La ficha de la segunda sociedad se guarda con
+// una clave propia (DNI@prefijo) para que sus datos no se mezclen; el DNI que se ve es siempre el real.
+function dniReal(e){ return (e&&e.dni_real)||(e&&e.dni)||''; }
+function numReg(e){
+  if(!e) return '';
+  var st=ST[e.dni], v=st&&st.edits&&st.edits[nregKey(e)];
+  return (v!==undefined&&v!==null&&v!=='') ? String(v) : String(e.archivo||'');
+}
+function numPartes(a){
+  var m=/^\s*(\d+)\s*[.,]\s*(\d+)\s*$/.exec(String(a===undefined||a===null?'':a));
+  return m ? {p:parseInt(m[1],10), n:parseInt(m[2],10)} : null;
+}
+function todasFichas(){
+  var seen={}, out=[];
+  function add(e){ if(!e||!e.dni) return; var k=normDni(e.dni)+'|'+e.archivo; if(seen[k]) return; seen[k]=1; out.push(e); }
+  EMPS_BASE.forEach(add);
+  ((ST['_extra']&&ST['_extra'].extra_emps)||[]).forEach(add);
+  EXTRA_EMPS.forEach(add);
+  return out;
+}
+// Siguiente numero libre de una sociedad: el mas alto que se ve en pantalla con ese prefijo, mas uno
 function getNextArchivo(sociedad, pfx, excludeDni){
-  // Build the most complete employee list possible
-  var seen = {};
-  var allE = [];
-  // 1. Start with EMPS_BASE
-  EMPS_BASE.forEach(function(e){ if(!seen[e.dni]){seen[e.dni]=1;allE.push(e);} });
-  // 2. Add ST._extra (from Supabase)
-  var stEx = (ST['_extra']&&ST['_extra'].extra_emps)||[];
-  stEx.forEach(function(e){ if(!seen[e.dni]){seen[e.dni]=1;allE.push(e);} });
-  // 3. Add local EXTRA_EMPS
-  EXTRA_EMPS.forEach(function(e){ if(!seen[e.dni]){seen[e.dni]=1;allE.push(e);} });
-
-  var maxN = -1;
-  allE.forEach(function(e){
-    if(excludeDni && e.dni===excludeDni) return;
-    // Get true sociedad (edits override base)
-    var st2 = ST[e.dni]||{};
-    var eSoc = (st2.edits&&st2.edits.sociedad)||e.sociedad||'';
-    if(eSoc !== sociedad) return;
-    // Get true archivo (edits override base)
-    var eArch = (st2.edits&&st2.edits.archivo)||e.archivo||'';
-    if(!eArch) return;
-    var pts = String(eArch).split('.');
-    if(pts.length===2 && pts[0]===String(pfx)){
-      var n = parseInt(pts[1]);
-      if(!isNaN(n) && n > maxN) maxN = n;
-    }
+  var maxN=-1;
+  todasFichas().forEach(function(e){
+    var p=numPartes(numReg(e));
+    if(p && p.p===Number(pfx) && p.n>maxN) maxN=p.n;
   });
   return pfx+'.'+(maxN+1);
+}
+function quienTieneNum(num, salvo){
+  var otro=null;
+  EMPS_BASE.forEach(function(e){ if(e!==salvo && normDni(e.dni)!==normDni(salvo&&salvo.dni) && numReg(e)===num) otro=e; });
+  return otro;
+}
+// Cambio manual del Nº de registro desde la ficha
+function saveNumReg(emp, valor){
+  var es2=ges(emp.dni); if(!es2.edits) es2.edits={};
+  var oldVal=numReg(emp), p=numPartes(valor);
+  if(!p){ alert('El Nº de registro tiene que ser como 3.71: el número de la sociedad, un punto y el consecutivo.'); return; }
+  var newVal=p.p+'.'+p.n;
+  if(newVal===oldVal){ closeModal('MEC'); return; }
+  var otro=quienTieneNum(newVal, emp);
+  if(otro){
+    alert('El '+newVal+' ya lo tiene '+(getField(otro,ges(otro.dni),'nombre')||otro.nombre)+'.\n\nCambia primero el número de esa persona, o elige otro.');
+    return;
+  }
+  var soc=getField(emp,es2,'sociedad')||emp.sociedad||'', pf=SOC_PFX[soc];
+  if(pf && p.p!==pf){
+    if(!confirm('Los números de '+sA(soc)+' empiezan por '+pf+'.\n\n¿Guardar '+newVal+' de todas formas?')) return;
+  }
+  if(newVal===String(emp.archivo)) delete es2.edits[nregKey(emp)]; else es2.edits[nregKey(emp)]=newVal;
+  es2.historial.push({id:Date.now()+'',fecha:new Date().toLocaleDateString('es-ES'),campo:'Nº Registro',anterior:oldVal,nuevo:newVal,usuario:USER});
+  closeModal('MEC');
+  saveAll();
+  renderDetail(emp);
+  renderList();
+}
+// Dos ordenadores que dan de alta a la vez calculan el mismo numero. El que guarda en segundo lugar
+// cambia el suyo antes de escribir (solo altas que todavia no estaban guardadas en Supabase).
+function resolverChoques(merged, remote){
+  var rx=(remote&&remote['_extra']&&remote['_extra'].extra_emps)||[];
+  var mx=(merged['_extra']&&merged['_extra'].extra_emps)||[];
+  if(!rx.length || !mx.length) return [];
+  function eff(e){ var st=merged[e.dni], v=st&&st.edits&&st.edits['nreg_'+e.archivo]; return (v!==undefined&&v!==null&&v!=='')?String(v):String(e.archivo||''); }
+  var enRemoto={}, usados={}, cambios=[];
+  rx.forEach(function(e){ if(e&&e.dni){ enRemoto[normDni(e.dni)]=1; usados[eff(e)]=normDni(e.dni); } });
+  mx.forEach(function(e){
+    if(!e||!e.dni) return;
+    var k=normDni(e.dni);
+    if(enRemoto[k]) return;                    // ya estaba guardada: no se toca nunca
+    var num=eff(e);
+    if(!usados[num] || usados[num]===k) return;
+    var p=numPartes(num); if(!p) return;
+    var maxN=-1;
+    todasFichas().concat(mx).forEach(function(x){ var q=numPartes(x.dni&&merged[x.dni]?eff(x):numReg(x)); if(q&&q.p===p.p&&q.n>maxN) maxN=q.n; });
+    var nuevo=p.p+'.'+(maxN+1), viejo=String(e.archivo);
+    function cambia(x){ if(x && normDni(x.dni)===k && String(x.archivo)===viejo) x.archivo=nuevo; }
+    cambia(e); EMPS_BASE.forEach(cambia); EXTRA_EMPS.forEach(cambia);
+    ((ST['_extra']&&ST['_extra'].extra_emps)||[]).forEach(cambia);
+    var st=merged[e.dni]; if(st&&st.edits&&st.edits['nreg_'+viejo]!==undefined) delete st.edits['nreg_'+viejo];
+    usados[nuevo]=k;
+    cambios.push({nombre:e.nombre, viejo:viejo, nuevo:nuevo});
+  });
+  return cambios;
+}
+function avisarChoques(cambios){
+  if(!cambios || !cambios.length) return;
+  renderList();
+  if(cDni){ var eSel=getEmp(cDni); if(eSel) renderDetail(eSel); }
+  var txt=cambios.map(function(c){ return '· '+c.nombre+': pasa del '+c.viejo+' al '+c.nuevo; }).join('\n');
+  setTimeout(function(){ alert('Desde otro ordenador se ha dado de alta a otra persona a la vez y había cogido el mismo número.\n\nPara que no se repita:\n'+txt); }, 50);
+}
+// ---------- Reordenar consecutivos ----------
+// Regla: cada sociedad se numera desde el .0, de la persona mas antigua a la mas reciente.
+//  - quien ha estado en dos sociedades tiene un numero en cada una, segun su antiguedad en cada una
+//  - quien tiene dos fichas en la MISMA sociedad conserva un unico numero: el de su primera incorporacion
+var NOM_SOC = {1:'Ascent',2:'Bowie',3:'Educar',4:'Desko',5:'Quantum'};
+function escH(t){ return String(t===undefined||t===null?'':t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+// Primera incorporacion de la ficha en su sociedad actual (cuenta los contratos anteriores archivados en esa sociedad)
+function antiguedadFicha(e){
+  var es2=ST[e.dni]||{};
+  var soc=getField(e,es2,'sociedad')||e.sociedad||'';
+  var d=isoFecha(getField(e,es2,'inicio')||e.inicio);
+  (es2.historial_contratos||[]).forEach(function(c){
+    var x=isoFecha(c&&c.inicio);
+    if(x && sA(String((c&&c.sociedad)||''))===sA(soc) && (!d || x<d)) d=x;
+  });
+  return d;
+}
+function planConsecutivos(){
+  var grupos={}, sinSociedad=[];
+  EMPS_BASE.forEach(function(e){
+    var es2=ST[e.dni]||{};
+    var soc=getField(e,es2,'sociedad')||e.sociedad||'', pf=SOC_PFX[soc];
+    if(!pf){ sinSociedad.push(e); return; }
+    var g=grupos[pf]=grupos[pf]||{}, k=normDni(e.dni);
+    var per=g[k]=g[k]||{fichas:[], ini:'', act:null, nombre:getField(e,es2,'nombre')||e.nombre||''};
+    per.fichas.push(e);
+    var d=antiguedadFicha(e); if(d && (!per.ini || d<per.ini)) per.ini=d;
+    var p=numPartes(numReg(e)); if(p && p.p===pf && (per.act===null || p.n<per.act)) per.act=p.n;
+  });
+  var cambios=[], resumen=[], sinFecha=[], todos=[];
+  Object.keys(grupos).map(Number).sort(function(a,b){return a-b;}).forEach(function(pf){
+    var ps=Object.keys(grupos[pf]).map(function(k){ return grupos[pf][k]; });
+    ps.sort(function(a,b){
+      var da=a.ini||'9999-99-99', db=b.ini||'9999-99-99'; if(da!==db) return da<db?-1:1;
+      var na=a.act===null?1e9:a.act, nb=b.act===null?1e9:b.act; if(na!==nb) return na-nb;
+      return String(a.nombre).localeCompare(String(b.nombre));
+    });
+    var nf=0, cam=0;
+    ps.forEach(function(per,i){
+      var nuevo=pf+'.'+i;
+      if(!per.ini) sinFecha.push(per.nombre);
+      per.fichas.forEach(function(e){
+        var act=numReg(e), fila={e:e, soc:NOM_SOC[pf], nombre:per.nombre, ini:per.ini, antes:act, despues:nuevo};
+        nf++; todos.push(fila);
+        if(act!==nuevo){ cam++; cambios.push(fila); }
+      });
+    });
+    resumen.push({soc:NOM_SOC[pf], personas:ps.length, fichas:nf, cambian:cam, primero:pf+'.0', ultimo:pf+'.'+(ps.length-1)});
+  });
+  return {cambios:cambios, resumen:resumen, sinFecha:sinFecha, sinSociedad:sinSociedad, todos:todos};
+}
+function undoConsecutivos(){
+  var c=ST['_config'], raw=c&&c.edits&&c.edits.nreg_undo;
+  if(!raw) return null;
+  try{ var u=JSON.parse(raw); return (u&&u.prev)?u:null; }catch(x){ return null; }
+}
+function openReordenar(){
+  var plan=planConsecutivos(), u=undoConsecutivos();
+  var m=document.getElementById('MRC');
+  if(!m){ m=document.createElement('div'); m.className='mo'; m.id='MRC'; document.body.appendChild(m); }
+  var th='style="text-align:left;padding:.25rem .4rem;border-bottom:1px solid var(--b);color:var(--mu);font-weight:600;position:sticky;top:0;background:var(--m)"';
+  var td='style="padding:.22rem .4rem;border-bottom:1px solid var(--b)"';
+  var h='<div class="md" style="width:720px"><h3>&#128290; Reordenar consecutivos</h3>';
+  h+='<p style="font-size:.76rem;color:var(--mu);line-height:1.45;margin:.4rem 0 .7rem">Cada sociedad se numera desde el <b>.0</b>, de la persona más antigua a la más reciente. Quien ha estado en dos sociedades tiene un número en cada una. Quien tiene dos fichas en la misma sociedad conserva un solo número, el de su primera incorporación.</p>';
+  h+='<table style="width:100%;border-collapse:collapse;font-size:.75rem;margin-bottom:.7rem"><tr><th '+th+'>Sociedad</th><th '+th+'>Personas</th><th '+th+'>Numeración</th><th '+th+'>Fichas que cambian</th></tr>';
+  plan.resumen.forEach(function(r){ h+='<tr><td '+td+'>'+escH(r.soc)+'</td><td '+td+'>'+r.personas+'</td><td '+td+'>'+r.primero+' a '+r.ultimo+'</td><td '+td+'>'+(r.cambian||'ninguna')+'</td></tr>'; });
+  h+='</table>';
+  if(plan.sinFecha.length) h+='<div style="font-size:.74rem;color:var(--dg);margin-bottom:.5rem">&#9888; Sin fecha de incorporación (se colocan al final de su sociedad): '+escH(plan.sinFecha.join('; '))+'</div>';
+  if(plan.sinSociedad.length) h+='<div style="font-size:.74rem;color:var(--dg);margin-bottom:.5rem">&#9888; '+plan.sinSociedad.length+' fichas sin una sociedad reconocida: no se tocan.</div>';
+  if(plan.cambios.length){
+    h+='<div style="font-size:.78rem;font-weight:600;margin-bottom:.35rem">Cambios ('+plan.cambios.length+')</div>';
+    h+='<div style="max-height:38vh;overflow-y:auto;border:1px solid var(--b);border-radius:6px"><table id="MRC-T" style="width:100%;border-collapse:collapse;font-size:.74rem"><tr><th '+th+'>Sociedad</th><th '+th+'>Nombre</th><th '+th+'>Antigüedad</th><th '+th+'>Nº actual</th><th '+th+'>Nº nuevo</th></tr>';
+    plan.cambios.forEach(function(c){ h+='<tr><td '+td+'>'+escH(c.soc)+'</td><td '+td+'>'+escH(c.nombre)+'</td><td '+td+'>'+escH(fd(c.ini))+'</td><td '+td+'>'+escH(c.antes)+'</td><td '+td+'><b>'+escH(c.despues)+'</b></td></tr>'; });
+    h+='</table></div>';
+  } else {
+    h+='<div id="MRC-OK" style="font-size:.8rem;padding:.6rem .7rem;border-radius:6px;background:rgba(63,185,80,.1);color:var(--success)">&#10003; Todos los números están ya en orden. No hay nada que cambiar.</div>';
+  }
+  h+='<div style="display:flex;gap:.5rem;justify-content:flex-end;flex-wrap:wrap;margin-top:.9rem">';
+  if(u) h+='<button class="btn btn-o" style="margin-right:auto" onclick="deshacerConsecutivos()">&#8630; Deshacer la reordenación del '+escH(u.fecha)+'</button>';
+  h+='<button class="btn btn-o" onclick="closeModal(\'MRC\')">Cerrar</button>';
+  if(plan.cambios.length){
+    h+='<button class="btn btn-o" onclick="descargarPlanConsecutivos()">&#128229; Descargar la lista (Excel)</button>';
+    h+='<button class="btn btn-r" id="MRC-AP" onclick="aplicarConsecutivos()">Aplicar los '+plan.cambios.length+' cambios</button>';
+  }
+  h+='</div></div>';
+  m.innerHTML=h;
+  m.classList.add('open');
+}
+function _refrescarTrasNumeros(){
+  renderList(); updStats();
+  if(cDni){ var eSel=getEmp(cDni); if(eSel) renderDetail(eSel); }
+}
+function aplicarCambios(cambios){
+  var hoy=new Date().toLocaleDateString('es-ES'), t=Date.now(), prev={};
+  cambios.forEach(function(c,i){
+    var es2=ges(c.e.dni); if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+    var k=nregKey(c.e);
+    prev[c.e.dni+'|'+c.e.archivo]=(es2.edits[k]!==undefined)?es2.edits[k]:null;
+    if(c.despues===String(c.e.archivo)) delete es2.edits[k]; else es2.edits[k]=c.despues;
+    es2.historial.push({id:(t+i)+'',fecha:hoy,campo:'Nº Registro',anterior:c.antes,nuevo:c.despues,usuario:USER});
+  });
+  if(!ST['_config']) ST['_config']={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+  if(!ST['_config'].edits) ST['_config'].edits={};
+  ST['_config'].edits.nreg_undo=JSON.stringify({fecha:hoy, n:cambios.length, prev:prev});
+}
+function aplicarConsecutivos(){
+  var plan=planConsecutivos();
+  if(!plan.cambios.length){ openReordenar(); return; }
+  if(!confirm('Se va a cambiar el Nº de registro de '+plan.cambios.length+' fichas.\n\nCada cambio queda anotado en el historial y se puede deshacer desde esta misma ventana.\n\n¿Aplicar?')) return;
+  aplicarCambios(plan.cambios);
+  saveAll();
+  _refrescarTrasNumeros();
+  openReordenar();
+  setTimeout(function(){ alert('Hecho: '+plan.cambios.length+' fichas con número nuevo.'); },50);
+}
+// Alta (o ficha nueva) con una fecha anterior a la de otras personas de su sociedad: se ofrece colocarla
+// en su sitio. Solo se mueven ella y las que van detras de ese sitio (cada una un numero mas).
+function ofrecerColocar(emp){
+  var es2=ST[emp.dni]||{}, soc=getField(emp,es2,'sociedad')||emp.sociedad||'', pf=SOC_PFX[soc];
+  if(!pf) return false;
+  var ini=antiguedadFicha(emp), mio=numPartes(numReg(emp));
+  if(!ini || !mio || mio.p!==pf) return false;
+  var otras=[];
+  EMPS_BASE.forEach(function(x){
+    if(x===emp || normDni(dniReal(x))===normDni(dniReal(emp)) && SOC_PFX[getField(x,ST[x.dni]||{},'sociedad')||x.sociedad]===pf) return;
+    var sx=getField(x,ST[x.dni]||{},'sociedad')||x.sociedad||'';
+    if(SOC_PFX[sx]!==pf) return;
+    var p=numPartes(numReg(x)); if(!p || p.p!==pf || p.n>=mio.n) return;
+    otras.push({e:x, n:p.n, ini:antiguedadFicha(x)});
+  });
+  var detras=otras.filter(function(o){ return o.ini && o.ini>ini; });
+  if(!detras.length) return false;
+  var sitio=Math.min.apply(null, detras.map(function(o){ return o.n; }));
+  var mover=otras.filter(function(o){ return o.n>=sitio; });
+  var nom=NOM_SOC[pf], nombre=getField(emp,es2,'nombre')||emp.nombre, personas={};
+  mover.forEach(function(o){ personas[normDni(dniReal(o.e))]=1; });
+  var np=Object.keys(personas).length;
+  var txt=nombre+' entró el '+fd(ini)+', antes que '+np+(np===1?' persona':' personas')+' de '+nom+' que ya tienen número.\n\n¿Colocarla en su sitio por antigüedad?\n\n'+
+    'Aceptar: pasa a ser el '+pf+'.'+sitio+' y '+(np===1?'esa persona pasa':'esas '+np+' personas pasan')+' a tener un número más.\n'+
+    'Cancelar: se queda con el '+numReg(emp)+' (se puede colocar más tarde en Informes → Reordenar consecutivos).';
+  if(!confirm(txt)) return false;
+  var cambios=[{e:emp, antes:numReg(emp), despues:pf+'.'+sitio}];
+  mover.forEach(function(o){ cambios.push({e:o.e, antes:numReg(o.e), despues:pf+'.'+(o.n+1)}); });
+  aplicarCambios(cambios);
+  return true;
+}
+function isoMenos1(iso){
+  var d=new Date(iso+'T12:00:00'); d.setDate(d.getDate()-1);
+  return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2);
+}
+// Importaciones por DNI: si la persona tiene ficha en varias sociedades, la vigente en esa fecha
+function fichaPorDniYFecha(dni, f){
+  var c=[]; EMPS_BASE.forEach(function(x){ if(normDni(dniReal(x))===dni) c.push(x); });
+  if(!c.length && ST['_extra'] && ST['_extra'].extra_emps){
+    ST['_extra'].extra_emps.forEach(function(x){ if(x && normDni(dniReal(x))===dni) c.push(x); });
+  }
+  if(c.length<2) return c[0]||null;
+  function rango(x){ var st=ST[x.dni]||{}; return {i:isoFecha(getField(x,st,'inicio')||x.inicio), b:isoFecha(getField(x,st,'baja')||x.baja)}; }
+  var dentro=c.filter(function(x){ var r=rango(x); return r.i && r.i<=f && (!r.b || f<=r.b); });
+  if(dentro.length) return dentro[dentro.length-1];
+  var activos=c.filter(function(x){ return getEstado(x)!=='BAJA'; });
+  return activos[0]||c[0];
+}
+
+function deshacerConsecutivos(){
+  var u=undoConsecutivos(); if(!u) return;
+  if(!confirm('Se van a devolver '+u.n+' fichas al número que tenían antes de la reordenación del '+u.fecha+'.\n\n¿Deshacer?')) return;
+  var hoy=new Date().toLocaleDateString('es-ES'), t=Date.now(), i=0;
+  EMPS_BASE.forEach(function(e){
+    var kk=e.dni+'|'+e.archivo;
+    if(!u.prev.hasOwnProperty(kk)) return;
+    var es2=ges(e.dni); if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+    var antes=numReg(e), k=nregKey(e);
+    if(u.prev[kk]===null) delete es2.edits[k]; else es2.edits[k]=u.prev[kk];
+    var ahora=numReg(e);
+    if(ahora!==antes) es2.historial.push({id:(t+(i++))+'',fecha:hoy,campo:'Nº Registro',anterior:antes,nuevo:ahora,usuario:USER});
+  });
+  delete ST['_config'].edits.nreg_undo;
+  saveAll();
+  _refrescarTrasNumeros();
+  openReordenar();
+}
+function descargarPlanConsecutivos(){
+  if(typeof XLSX==='undefined'){
+    var sc=document.createElement('script');
+    sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    sc.onload=descargarPlanConsecutivos; document.head.appendChild(sc); return;
+  }
+  var plan=planConsecutivos(), wb=XLSX.utils.book_new();
+  var f=function(c){ return [c.soc,c.nombre,dniReal(c.e),fd(c.ini),c.antes,c.despues,c.antes===c.despues?'':'CAMBIA']; };
+  var cab=['Sociedad','Nombre','DNI','Antigüedad en la sociedad','Nº actual','Nº nuevo','Cambia'];
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cab].concat(plan.cambios.map(f))),'cambios');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([cab].concat(plan.todos.map(f))),'todos');
+  XLSX.writeFile(wb,'RRHH_reordenar_consecutivos_'+new Date().toLocaleDateString('es-ES').replace(/\//g,'-')+'.xlsx');
+}
+
+// Revision de consecutivos: una fila por numero, ordenado, con avisos
+function isoFecha(d){
+  d=String(d||''); if(d.indexOf('/')>0){ var q=d.split('/'); if(q.length===3) d=q[2]+'-'+('0'+q[1]).slice(-2)+'-'+('0'+q[0]).slice(-2); }
+  return /^\d{4}-\d{2}-\d{2}/.test(d) ? d.substring(0,10) : '';
+}
+function revisarConsecutivos(){
+  var NOM={1:'Ascent',2:'Bowie',3:'Educar',4:'Desko',5:'Quantum'};
+  var grupos={}, sinNum=[];
+  EMPS_BASE.forEach(function(e){
+    var es2=ges(e.dni), p=numPartes(numReg(e));
+    var f={e:e, num:numReg(e), p:p, nombre:getField(e,es2,'nombre')||e.nombre, soc:getField(e,es2,'sociedad')||e.sociedad||'',
+      ini:antiguedadFicha(e), baja:getField(e,es2,'baja')||e.baja||'', est:getEstado(e), aviso:[]};
+    if(!p){ sinNum.push(f); return; }
+    (grupos[p.p]=grupos[p.p]||[]).push(f);
+  });
+  var out=[], res=[];
+  Object.keys(grupos).map(Number).sort(function(a,b){return a-b;}).forEach(function(pf){
+    var g=grupos[pf].sort(function(a,b){ return a.p.n-b.p.n; });
+    var cnt={}, dn={}; g.forEach(function(f){ var k=f.p.n+'|'+normDni(f.e.dni); if(!dn[k]){ dn[k]=1; cnt[f.p.n]=(cnt[f.p.n]||0)+1; } });
+    // fuera de orden: los que hay que mover para que numero y fecha de incorporacion vayan a la par
+    var c=g.filter(function(f){ return f.ini; }), L=[], prev=[], best=-1, i, j;
+    for(i=0;i<c.length;i++){ L[i]=1; prev[i]=-1; for(j=0;j<i;j++){ if(c[j].ini<=c[i].ini && L[j]+1>L[i]){ L[i]=L[j]+1; prev[i]=j; } } if(best<0||L[i]>L[best]) best=i; }
+    var enOrden={}; for(i=best;i>=0;i=prev[i]) enOrden[c[i].num+'|'+c[i].e.dni]=1;
+    var nRep=0, nFuera=0, huecos=[], esperado=g.length?g[0].p.n:0;
+    g.forEach(function(f){
+      for(; esperado<f.p.n; esperado++){ huecos.push(pf+'.'+esperado); out.push([NOM[pf]||('Prefijo '+pf), pf+'.'+esperado, '(número sin usar)','','','','','HUECO']); }
+      if(f.p.n>=esperado) esperado=f.p.n+1;
+      if(cnt[f.p.n]>1){ f.aviso.push('REPETIDO'); nRep++; }
+      if(f.ini && !enOrden[f.num+'|'+f.e.dni]){ f.aviso.push('FUERA DE ORDEN por fecha de incorporación'); nFuera++; }
+      if(SOC_PFX[f.soc] && SOC_PFX[f.soc]!==pf) f.aviso.push('Número de '+(NOM[pf]||pf)+' en una ficha de '+sA(f.soc));
+      out.push([NOM[pf]||('Prefijo '+pf), f.num, f.nombre, dniReal(f.e), fd(f.ini), fd(f.baja), f.est, f.aviso.join(' · ')]);
+    });
+    res.push([NOM[pf]||('Prefijo '+pf), g.length, g.length?g[0].num:'', g.length?g[g.length-1].num:'', huecos.join(', ')||'-', nRep||'-', nFuera||'-']);
+  });
+  sinNum.forEach(function(f){ out.push(['-', f.num, f.nombre, dniReal(f.e), fd(f.ini), fd(f.baja), f.est, 'NÚMERO NO VÁLIDO']); });
+  return {filas:out, resumen:res};
 }
 
 function buildDespachoOptions(selectId, selectedVal){
@@ -611,7 +916,7 @@ var editOldVal = null;
 // ============================================================
 // INIT
 // ============================================================
-var PORTAL_VERSION = 'v3.2';
+var PORTAL_VERSION = 'v3.5';
 var LSK_PEND = 'da_rrhh_pending';
 var _snap = {};            // ultimo estado visto en Supabase, por clave (JSON)
 var _remoteLoaded = false; // ya se ha leido Supabase en esta sesion
@@ -1104,6 +1409,7 @@ function saveAll(){
       var oldRev=(remote['_meta']&&remote['_meta'].rev)||'';
       if(!/^rv[a-z0-9]+$/.test(oldRev)) oldRev='';
       merged['_meta']={rev:newRev(), tag:REV_TAG, ts:new Date().toISOString(), v:PORTAL_VERSION};
+      var choques=resolverChoques(merged, remote);
       applyState(merged);
       // lo remoto ya esta incorporado a ST: pasa a ser la referencia aunque la escritura falle
       _snap=snapshotOf(remote);
@@ -1111,6 +1417,7 @@ function saveAll(){
       var listChanged=syncExtra(); applyDniAliases(); loadDespachos();
       try{ localStorage.setItem(LSK, JSON.stringify(ST)); }catch(x){}
       if(listChanged){ renderList(); updStats(); buildAlerts(); }
+      avisarChoques(choques);
       var body=JSON.stringify({id:1, contenido: JSON.stringify(merged)});
       var cond = rowExists && _useCas && n<4;
       // condicion: el contenido sigue siendo el que se acaba de leer
@@ -1482,8 +1789,8 @@ function renderList(){
   var list=EMPS_BASE.filter(function(e){
     if(!mF(e))return false;
     if(!q)return true;
-    return e.nombre.toLowerCase().indexOf(q)>=0||e.dni.toLowerCase().indexOf(q)>=0||
-      e.archivo.toLowerCase().indexOf(q)>=0||
+    return e.nombre.toLowerCase().indexOf(q)>=0||dniReal(e).toLowerCase().indexOf(q)>=0||
+      numReg(e).toLowerCase().indexOf(q)>=0||
       (e.puesto||'').toLowerCase().indexOf(q)>=0||
       (e.despacho||'').toLowerCase().indexOf(q)>=0;
   });
@@ -1630,7 +1937,7 @@ function renderDetail(emp){
   var pb=document.createElement('div'); pb.className='pbadges';
   var b1=document.createElement('span'); b1.className='badge '+badgeCls(est); b1.textContent=est;
   var b2=document.createElement('span'); b2.className='badge'; b2.style.cssText='background:rgba(255,255,255,.07);color:var(--mu)';
-  b2.textContent='Nº '+emp.archivo;
+  b2.textContent='Nº '+numReg(emp);
   var b3=document.createElement('span'); b3.className='pac-v '+al.k; b3.textContent=al.t;
   var sem=document.createElement('span'); sem.className='sem '+semaforo(emp);
   pb.appendChild(sem); pb.appendChild(b1); pb.appendChild(b2); pb.appendChild(b3);
@@ -1653,7 +1960,7 @@ function renderDetail(emp){
   var currentSoc = getField(emp, es2, 'sociedad') || emp.sociedad || '';
   var related = [];
   EMPS_BASE.forEach(function(e) {
-    if(e.dni === emp.dni && e.archivo !== emp.archivo) {
+    if(e!==emp && normDni(dniReal(e)) === normDni(dniReal(emp))) {
       related.push(e);
     }
   });
@@ -1676,19 +1983,19 @@ function renderDetail(emp){
       if(est === 'BAJA' && relEst === 'ACTIVO') {
         banner.className = 'contract-link-banner';
         icon.textContent = String.fromCodePoint(128279);
-        text.innerHTML = 'Continuó en <strong>' + socShort(relSoc) + '</strong> desde ' + fd(relInicio) + ' · N° ' + relArch;
+        text.innerHTML = 'Continuó en <strong>' + socShort(relSoc) + '</strong> desde ' + fd(relInicio) + ' · N° ' + (rel.num||relArch);
         btn.textContent = 'Ver ficha activa →';
         btn.onclick = (function(a){ return function(){ selEmpByArchivo(a); }; })(relArch);
       } else if(est === 'ACTIVO' && relEst === 'BAJA') {
         banner.className = 'contract-prev-banner';
         icon.textContent = String.fromCodePoint(128336);
-        text.innerHTML = 'Contrato anterior en <strong>' + socShort(relSoc) + '</strong> · ' + fd(relInicio) + (relBaja&&relBaja!=='-'&&relBaja!=='ANULADA' ? ' - ' + fd(relBaja) : '') + ' · N° ' + relArch;
+        text.innerHTML = 'Contrato anterior en <strong>' + socShort(relSoc) + '</strong> · ' + fd(relInicio) + (relBaja&&relBaja!=='-'&&relBaja!=='ANULADA' ? ' - ' + fd(relBaja) : '') + ' · N° ' + (rel.num||relArch);
         btn.textContent = 'Ver ficha anterior ↗';
         btn.onclick = (function(a){ return function(){ selEmpByArchivo(a); }; })(relArch);
       } else {
         banner.className = 'contract-link-banner';
         icon.textContent = String.fromCodePoint(128279);
-        text.innerHTML = 'También en <strong>' + socShort(relSoc) + '</strong> · N° ' + relArch + ' · ' + relEst;
+        text.innerHTML = 'También en <strong>' + socShort(relSoc) + '</strong> · N° ' + (rel.num||relArch) + ' · ' + relEst;
         btn.textContent = 'Ver ficha →';
         btn.onclick = (function(a){ return function(){ selEmpByArchivo(a); }; })(relArch);
       }
@@ -1752,7 +2059,7 @@ function buildDatos(emp,es2,c){
   var cg1=document.createElement('div'); cg1.className='cg';
   var fields=[
     ['Nombre',         'nombre',      getField(emp,es2,'nombre'),      'text',   null],
-    ['DNI / NIE',      'dni',         emp.dni,                          'text',   null],
+    ['DNI / NIE',      'dni',         dniReal(emp),                          'text',   null],
     ['F. Nacimiento',  'nacimiento',  fd(getField(emp,es2,'nacimiento')||emp.nacimiento),  'date',   null],
     ['Email',          'email',       getField(emp,es2,'email'),        'text',   null],
     ['Telefono',       'telefono',    getField(emp,es2,'telefono'),     'text',   null],
@@ -1770,7 +2077,7 @@ function buildDatos(emp,es2,c){
   var soc=getField(emp,es2,'sociedad')||emp.sociedad;
   var tipo=getField(emp,es2,'tipo_contrato')||emp.tipo_contrato;
   var fields2=[
-    ['Nº Registro',  'archivo',       emp.archivo,                                                  'text',   null],
+    ['Nº Registro',  'archivo',       numReg(emp),                                                  'text',   null],
     ['Sociedad',          'sociedad',      soc,                                                           'select', SOCS],
     ['Despacho',          'despacho',      getField(emp,es2,'despacho'),                                  'select', DESPS],
     ['Puesto',            'puesto',        getField(emp,es2,'puesto'),                                    'text',   null],
@@ -2034,6 +2341,7 @@ function openEditField(emp,es2,label,field,currentVal,type,opts){
   } else {
     var inp2=document.createElement('input'); inp2.type='text'; inp2.id='EC-INPUT';
     inp2.value=(es2.edits&&es2.edits[field]!==undefined)?es2.edits[field]:(emp[field]||'');
+    if(field==='archivo') inp2.value=numReg(emp);
     fg.appendChild(inp2);
   }
   body.appendChild(fg);
@@ -2045,6 +2353,12 @@ function saveEdit(){
   var inp=document.getElementById('EC-INPUT'); if(!inp)return;
   var newVal=inp.value.trim();
   var emp=editField.emp, field=editField.field;
+  if(field==='archivo'){ saveNumReg(emp,newVal); return; }
+  if(field==='dni' && emp.dni_real){
+    var principal=null; EMPS_BASE.forEach(function(x){ if(!x.dni_real && normDni(x.dni)===normDni(emp.dni_real)) principal=x; });
+    alert('El DNI de esta persona se cambia en su primera ficha'+(principal?' (Nº '+numReg(principal)+', '+sA(getField(principal,ges(principal.dni),'sociedad')||principal.sociedad)+')':'')+'. Se actualiza solo en las demás.');
+    return;
+  }
   // se vuelve a leer la ficha: la sincronizacion puede haberla renovado con el modal abierto
   var es2=ges(emp.dni);
   if(!es2.edits) es2.edits={};
@@ -2058,6 +2372,7 @@ function saveEdit(){
     if(ST[oldDni]){ ST[newVal]=JSON.parse(JSON.stringify(ST[oldDni])); delete ST[oldDni]; }
     // Update emp object dni
     emp.dni=newVal;
+    [EMPS_BASE, EXTRA_EMPS, (ST['_extra']&&ST['_extra'].extra_emps)||[]].forEach(function(l){ l.forEach(function(x){ if(x && x.dni_real===oldDni) x.dni_real=newVal; }); });
     cDni=newVal;
     // Re-get es2 with new key
     es2=ges(newVal);
@@ -2071,17 +2386,22 @@ function saveEdit(){
   if(field==='baja' && newVal==='' && (es2.edits.estado==='BAJA'||!es2.edits.estado)){
     delete es2.edits.estado;
   }
-  // If sociedad changed, recalculate archivo number automatically
+  // Cambio de sociedad: el numero no cambia solo. Si es de otra sociedad, se pregunta.
+  var _numCambio=null;
   if(field==='sociedad' && newVal!==''){
-    var pfxNew2 = {'ASCENT LEGAL STRATEGIES SOCIEDAD LIM':1,'ASESORÍA BOWIE, S.L':2,
-      'CENTRO DE FORMACION EDUCAR SIN FRONTERAS':3,'DESKO HISPANOAMERICANA CORPORATION S':4,
-      'QUANTUM LEGAL SERVICES, SOCIEDAD LIM':5}[newVal]||0;
-    es2.edits.archivo = getNextArchivo(newVal, pfxNew2, emp.dni);
-    console.log('Archivo recalculado:',es2.edits.archivo,'para',newVal);
+    var pfN=SOC_PFX[newVal]||0, numAct=numReg(emp), pAct=numPartes(numAct);
+    if(pfN && (!pAct || pAct.p!==pfN)){
+      var sig=getNextArchivo(newVal, pfN, emp.dni);
+      if(confirm('Ahora tiene el Nº '+numAct+'.\n\n¿Darle el siguiente número de '+sA(newVal)+', el '+sig+'?\n\nAceptar: pasa a ser el '+sig+'\nCancelar: conserva el '+numAct)){
+        if(sig===String(emp.archivo)) delete es2.edits[nregKey(emp)]; else es2.edits[nregKey(emp)]=sig;
+        _numCambio={a:numAct,n:sig};
+      }
+    }
   }
   // Register in historial
   var today=new Date().toLocaleDateString('es-ES');
   es2.historial.push({id:Date.now()+'',fecha:today,campo:editField.label,anterior:oldVal,nuevo:newVal,usuario:USER});
+  if(_numCambio) es2.historial.push({id:(Date.now()+1)+'',fecha:today,campo:'Nº Registro',anterior:_numCambio.a,nuevo:_numCambio.n,usuario:USER});
   closeModal('MEC');
   saveAll();
   renderDetail(emp); // re-render
@@ -2340,14 +2660,14 @@ function runReport(tipo){
 
   function empBase(e){
     var es2=ges(e.dni);
-    return [emp.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),getField(e,es2,'puesto'),getEstado(e)];
+    return [numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),getField(e,es2,'puesto'),getEstado(e)];
   }
 
   if(tipo==='bbdd'){
     rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Puesto','Categoria','Email','Telefono','F.Nacimiento','F.Incorporacion','F.Baja','Motivo baja','% Jornada','H/Sem','Tipo contrato','Salario bruto/ano','Salario mensual','Cuenta bancaria','Caducidad doc','Estado','Responsable']];
     EMPS_BASE.forEach(function(e){
       var es2=ges(e.dni);
-      rows.push([e.archivo,e.nombre,e.dni,
+      rows.push([numReg(e),e.nombre,dniReal(e),
         getField(e,es2,'sociedad')||e.sociedad,getField(e,es2,'despacho'),getField(e,es2,'puesto'),
         getField(e,es2,'categoria'),getField(e,es2,'email'),getField(e,es2,'telefono'),
         fd(getField(e,es2,'nacimiento')||e.nacimiento),fd(getField(e,es2,'inicio')||e.inicio),fd(getField(e,es2,'baja')||e.baja),
@@ -2360,7 +2680,7 @@ function runReport(tipo){
     rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','F.Incorporacion','Tipo computo','Dias generados','Disfrutados','Pendientes','Solicitudes pendientes']];
     EMPS_BASE.forEach(function(e){
       var v=calcVacaciones(e), es2=ges(e.dni);
-      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+      rows.push([numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
         fd(getField(e,es2,'inicio')||e.inicio),v.tipo,v.generadas,v.disfrutadas,v.pendientes,v.solicitadas]);
     });
   } else if(tipo==='absentismo'){
@@ -2368,7 +2688,7 @@ function runReport(tipo){
     EMPS_BASE.forEach(function(e){
       var es2=ges(e.dni);
       (es2.records||[]).filter(function(r){return r.tipo!=='vacaciones';}).forEach(function(r){
-        rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+        rows.push([numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
           getEstado(e),r.tipo,fd(r.f1),fd(r.f2),r.dias||'',r.estado||'',r.obs||'']);
       });
     });
@@ -2377,7 +2697,7 @@ function runReport(tipo){
     EMPS_BASE.forEach(function(e){
       var es2=ges(e.dni);
       (es2.disciplinario||[]).forEach(function(r){
-        rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+        rows.push([numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
           r.tipo,fd(r.fecha_hecho),fd(r.fecha_com),r.estado,r.desc||'',r.implicados||'',r.obs||'']);
       });
     });
@@ -2385,7 +2705,7 @@ function runReport(tipo){
     rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Puesto','% Jornada','Salario bruto/ano','Salario mensual','Estado']];
     EMPS_BASE.forEach(function(e){
       var es2=ges(e.dni);
-      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+      rows.push([numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
         getField(e,es2,'puesto'),getField(e,es2,'jornada'),getField(e,es2,'salario'),
         getField(e,es2,'salario_mensual'),getEstado(e)]);
     });
@@ -2393,14 +2713,14 @@ function runReport(tipo){
     rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Cuenta bancaria','Estado']];
     EMPS_BASE.filter(function(e){return getEstado(e)==='ACTIVO';}).forEach(function(e){
       var es2=ges(e.dni);
-      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+      rows.push([numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
         es2.cuenta||getField(e,es2,'cuenta'),getEstado(e)]);
     });
   } else if(tipo==='caducidades'){
     rows=[['N Registro','Nombre','DNI','Sociedad','Despacho','Caducidad doc.','Alerta','Estado']];
     EMPS_BASE.forEach(function(e){
       var es2=ges(e.dni); var al=alDoc(getField(e,es2,'caducidad_doc')||e.caducidad_doc);
-      rows.push([e.archivo,e.nombre,e.dni,sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
+      rows.push([numReg(e),e.nombre,dniReal(e),sA(getField(e,es2,'sociedad')||e.sociedad),getField(e,es2,'despacho'),
         fd(getField(e,es2,'caducidad_doc')||e.caducidad_doc),al.t,getEstado(e)]);
     });
   } else if(tipo==='historial'){
@@ -2408,9 +2728,15 @@ function runReport(tipo){
     EMPS_BASE.forEach(function(e){
       var es2=ges(e.dni);
       (es2.historial||[]).forEach(function(h){
-        rows.push([e.archivo,e.nombre,e.dni,sA(e.sociedad),h.fecha,h.campo,h.anterior,h.nuevo,h.usuario]);
+        rows.push([numReg(e),e.nombre,dniReal(e),sA(e.sociedad),h.fecha,h.campo,h.anterior,h.nuevo,h.usuario]);
       });
     });
+  }
+
+  if(tipo==='consecutivos'){
+    var rc=revisarConsecutivos();
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet([['Sociedad','Fichas','Primer Nº','Último Nº','Números sin usar','Repetidos','Fuera de orden']].concat(rc.resumen)),'resumen');
+    rows=[['Sociedad','N Registro','Nombre','DNI','Antigüedad en la sociedad','F.Baja','Estado','Aviso']].concat(rc.filas);
   }
 
   if(rows&&rows.length>1){
@@ -2602,51 +2928,116 @@ function openNuevoContrato(){
   document.getElementById('MNC').classList.add('open');
 }
 
-function saveNuevoContrato(){
-  if(!cDni) return;
-  var nuevoInicio=document.getElementById('MNC-inicio').value;
-  if(!nuevoInicio){
-    document.getElementById('MNC-err').textContent='La fecha de inicio es obligatoria';
-    document.getElementById('MNC-err').style.display='block'; return;
-  }
-  var emp=getEmp(cDni); var es2=ges(cDni);
-  // Archive current contract in historial_contratos
+function leerNuevoContrato(){
+  function v(id){ var el=document.getElementById(id); return el?el.value:''; }
+  return {inicio:v('MNC-inicio'), tipo:v('MNC-tipo'), sociedad:v('MNC-sociedad'), despacho:v('MNC-despacho'),
+    jornada:v('MNC-jornada'), salario:v('MNC-salario'), pp:v('MNC-pp'), fin:v('MNC-fin')};
+}
+// Nuevo contrato en la MISMA ficha (misma sociedad): el anterior se archiva y el numero se conserva
+function aplicarNuevoContrato(emp, d){
+  var es2=ges(emp.dni);
   if(!es2.historial_contratos) es2.historial_contratos=[];
   var contratoArchivado={
     id: Date.now()+'',
     tipo: getField(emp,es2,'tipo_contrato')||emp.tipo_contrato||'',
     inicio: getField(emp,es2,'inicio')||emp.inicio||'',
-    fin: getField(emp,es2,'baja')||emp.baja||nuevoInicio,
+    fin: getField(emp,es2,'baja')||emp.baja||d.inicio,
     sociedad: getField(emp,es2,'sociedad')||emp.sociedad||'',
     despacho: getField(emp,es2,'despacho')||emp.despacho||'',
     jornada: getField(emp,es2,'jornada')||emp.jornada||'',
     salario: getField(emp,es2,'salario')||emp.salario||'',
+    num: numReg(emp),
     archivado_el: new Date().toLocaleDateString('es-ES')
   };
   es2.historial_contratos.push(contratoArchivado);
-  // Set new contract data
   if(!es2.edits) es2.edits={};
-  es2.edits.inicio=nuevoInicio;
-  es2.edits.tipo_contrato=document.getElementById('MNC-tipo').value;
-  es2.edits.sociedad=document.getElementById('MNC-sociedad').value;
-  es2.edits.despacho=document.getElementById('MNC-despacho').value;
-  var jornada=document.getElementById('MNC-jornada').value;
-  if(jornada) es2.edits.jornada=jornada;
-  var salario=document.getElementById('MNC-salario').value;
-  if(salario) es2.edits.salario=salario;
-  var pp=document.getElementById('MNC-pp').value;
-  if(pp) es2.edits.periodo_prueba_fin=pp;
-  var fin=document.getElementById('MNC-fin').value;
-  if(fin) es2.edits.fin_contrato=fin; else delete es2.edits.fin_contrato;
-  // Clear baja and reset estado
+  es2.edits.inicio=d.inicio;
+  es2.edits.tipo_contrato=d.tipo;
+  es2.edits.sociedad=d.sociedad;
+  es2.edits.despacho=d.despacho;
+  if(d.jornada) es2.edits.jornada=d.jornada;
+  if(d.salario) es2.edits.salario=d.salario;
+  if(d.pp) es2.edits.periodo_prueba_fin=d.pp;
+  if(d.fin) es2.edits.fin_contrato=d.fin; else delete es2.edits.fin_contrato;
   delete es2.edits.baja;
   delete es2.edits.estado;
-  // Register in historial
   es2.historial.push({
-    id:Date.now()+'',fecha:new Date().toLocaleDateString('es-ES'),
+    id:(Date.now()+1)+'',fecha:new Date().toLocaleDateString('es-ES'),
     campo:'Nuevo contrato',anterior:contratoArchivado.tipo+' ('+fd(contratoArchivado.inicio)+')',
-    nuevo:es2.edits.tipo_contrato+' desde '+fd(nuevoInicio),usuario:USER
+    nuevo:d.tipo+' desde '+fd(d.inicio),usuario:USER
   });
+}
+// Nuevo contrato en OTRA sociedad: la ficha actual se queda en su sociedad (con su numero) y el
+// contrato nuevo va a la ficha de la otra sociedad (nueva, con su numero, o la que ya tuviera alli)
+function nuevoContratoOtraSociedad(emp, d){
+  var es2=ges(emp.dni), real=dniReal(emp), pfN=SOC_PFX[d.sociedad], nomN=NOM_SOC[pfN];
+  var cur=getField(emp,es2,'sociedad')||emp.sociedad||'', nomC=sA(cur);
+  var previa=null;
+  EMPS_BASE.forEach(function(x){
+    if(x===emp || normDni(dniReal(x))!==normDni(real)) return;
+    if(SOC_PFX[getField(x,ST[x.dni]||{},'sociedad')||x.sociedad]===pfN) previa=x;
+  });
+  var sig=previa?numReg(previa):getNextArchivo(d.sociedad,pfN);
+  var bajaAct=getField(emp,es2,'baja')||'', diaAntes=isoMenos1(d.inicio);
+  var msg='El contrato nuevo es en '+nomN+', no en '+nomC+'.\n\n'+
+    (previa ? 'Ya tiene una ficha en '+nomN+' (Nº '+sig+'): el contrato nuevo se pone en esa ficha y conserva ese número.'
+            : 'Se crea una ficha nueva en '+nomN+' con el Nº '+sig+' y sus propios datos (vacaciones, ausencias, historial).')+'\n\n'+
+    'La ficha de '+nomC+' (Nº '+numReg(emp)+') se queda en '+nomC+(bajaAct?'.':', con baja el '+fd(diaAntes)+' (el día antes del contrato nuevo).')+'\n\n¿Continuar?';
+  if(!confirm(msg)) return null;
+  var hoy=new Date().toLocaleDateString('es-ES'), t=Date.now();
+  if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+  if(!bajaAct){
+    es2.edits.baja=diaAntes;
+    if(!getField(emp,es2,'motivo_baja')) es2.edits.motivo_baja='Cambio de sociedad';
+    es2.historial.push({id:t+'',fecha:hoy,campo:'F. Baja',anterior:'',nuevo:diaAntes,usuario:USER});
+  }
+  es2.historial.push({id:(t+1)+'',fecha:hoy,campo:'Cambio de sociedad',anterior:nomC+' Nº '+numReg(emp),nuevo:nomN+' Nº '+sig+' desde '+fd(d.inicio),usuario:USER});
+  if(previa){
+    aplicarNuevoContrato(previa, d);
+    return previa;
+  }
+  function g(f){ var v=getField(emp,es2,f); return (v!==undefined&&v!==null&&v!=='')?v:(emp[f]||''); }
+  var key=real+'@'+pfN, k2=2; while(getEmp(key)) key=real+'@'+pfN+'-'+(k2++);
+  var jornada=d.jornada||g('jornada')||'100';
+  var ne={
+    archivo: sig, sociedad: d.sociedad, dni: key, dni_real: real,
+    nombre: g('nombre'), email: g('email'), despacho: d.despacho||'', categoria: g('categoria'), puesto: g('puesto'),
+    nacimiento: g('nacimiento'), inicio: d.inicio, baja: '', motivo_baja: '', jornada: jornada,
+    tipo_contrato: d.tipo, salario: d.salario||'', cuenta: '', caducidad_doc: g('caducidad_doc'), estado: 'ACTIVO',
+    horas: (Math.round(parseFloat(jornada)/100*40*100)/100)+'', telefono: g('telefono'), responsable: g('responsable'),
+    salario_mensual: '', grupo_profesional: g('grupo_profesional'), periodo_prueba_fin: d.pp||'', fin_contrato: d.fin||'',
+    _nuevo: true
+  };
+  EXTRA_EMPS.push(ne); EMPS_BASE.push(ne);
+  if(!ST['_extra']) ST['_extra']={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+  ST['_extra'].extra_emps=unionExtras(ST['_extra'].extra_emps||[], [JSON.parse(JSON.stringify(ne))]);
+  var es3=ges(key);
+  es3.cuenta=es2.cuenta||'';
+  es3.historial.push({id:(t+2)+'',fecha:hoy,campo:'Alta por cambio de sociedad',anterior:nomC+' Nº '+numReg(emp),nuevo:nomN+' Nº '+sig+' desde '+fd(d.inicio),usuario:USER});
+  ofrecerColocar(ne);
+  return ne;
+}
+function saveNuevoContrato(){
+  if(!cDni) return;
+  var d=leerNuevoContrato();
+  if(!d.inicio){
+    document.getElementById('MNC-err').textContent='La fecha de inicio es obligatoria';
+    document.getElementById('MNC-err').style.display='block'; return;
+  }
+  var emp=getEmp(cDni); if(!emp) return;
+  var es2=ges(cDni);
+  var cur=getField(emp,es2,'sociedad')||emp.sociedad||'';
+  var pfN=SOC_PFX[d.sociedad], pfC=SOC_PFX[cur];
+  if(pfN && pfC && pfN!==pfC){
+    var dest=nuevoContratoOtraSociedad(emp, d);
+    if(!dest) return;
+    closeModal('MNC');
+    saveAll();
+    renderList(); updStats(); buildAlerts();
+    selEmp(dest.dni, dest.archivo);
+    return;
+  }
+  aplicarNuevoContrato(emp, d);
   closeModal('MNC');
   saveAll();
   renderDetail(emp);
@@ -2728,16 +3119,8 @@ function doImport() {
     var f1 = parseDate(f1raw), f2 = parseDate(f2raw);
     if(!f1||!f2) { skip++; errs.push('Fecha invalida para DNI '+dni); return; }
 
-    // Find employee by DNI
-    var emp = null;
-    for(var i=0;i<EMPS_BASE.length;i++){
-      if(EMPS_BASE[i].dni.toUpperCase().replace(/[^A-Z0-9]/g,'')===dni){emp=EMPS_BASE[i];break;}
-    }
-    if(!emp && ST['_extra'] && ST['_extra'].extra_emps){
-      for(var j=0;j<ST['_extra'].extra_emps.length;j++){
-        if(ST['_extra'].extra_emps[j].dni.toUpperCase().replace(/[^A-Z0-9]/g,'')===dni){emp=ST['_extra'].extra_emps[j];break;}
-      }
-    }
+    // Find employee by DNI (si tiene ficha en varias sociedades: la que estaba vigente en esa fecha)
+    var emp = fichaPorDniYFecha(dni, f1);
     if(!emp) { skip++; errs.push('DNI no encontrado: '+dni); return; }
 
     var es2 = ges(emp.dni);
@@ -2942,15 +3325,12 @@ function saveNewEmp() {
   var exists = EMPS_BASE.some(function(e){ return e.dni.toUpperCase() === dni; });
   var existsExtra = EXTRA_EMPS.some(function(e){ return e.dni.toUpperCase() === dni; });
   if (exists || existsExtra) {
-    errEl.textContent = 'Ya existe un empleado con ese DNI.';
+    errEl.textContent = 'Ya existe un empleado con ese DNI. Si empieza un contrato nuevo (también en otra sociedad), ábrelo desde su ficha con "+ Nuevo contrato".';
     errEl.style.display = 'block'; return;
   }
 
   // ROBUST consecutive number generation
-  var SOC_PFX_MAP = {'ASCENT LEGAL STRATEGIES SOCIEDAD LIM':1,'ASESORÍA BOWIE, S.L':2,
-    'CENTRO DE FORMACION EDUCAR SIN FRONTERAS':3,'DESKO HISPANOAMERICANA CORPORATION S':4,
-    'QUANTUM LEGAL SERVICES, SOCIEDAD LIM':5};
-  var pfx = SOC_PFX_MAP[sociedad] || 0;
+  var pfx = SOC_PFX[sociedad] || 0;
   var archivo = getNextArchivo(sociedad, pfx, null);
 
   var jornada = document.getElementById('NE-jornada').value || '100';
@@ -2994,6 +3374,7 @@ function saveNewEmp() {
   ST['_extra'].extra_emps = unionExtras(ST['_extra'].extra_emps||[], [JSON.parse(JSON.stringify(newEmp))]);
 
   closeModal('MNE');
+  ofrecerColocar(newEmp);
   saveAll();
   renderList();
   updStats();
