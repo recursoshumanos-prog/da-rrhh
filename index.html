@@ -270,7 +270,7 @@ if(storedVer && storedVer !== htmlVer){
     <span class="ttitle">Portal RRHH</span><span id="PVER" style="font-size:10px;opacity:.55;margin-left:8px"></span>
     <div class="tright">
       <span class="sync-dot" id="SDOT"></span><span class="tsave" id="SLBL"></span>
-      <button class="btn btn-r btn-sm" onclick="openNewEmp()">&#43; Nuevo empleado</button><button class="btn btn-o btn-sm" onclick="openImport()">&#128229; Importar</button><button class="btn btn-o btn-sm" onclick="openGestionDespachos()">&#127970; Despachos</button><button class="btn btn-o btn-sm" onclick="openReports()">&#128202; Informes</button>
+      <button class="btn btn-r btn-sm" onclick="openNewEmp()">&#43; Nuevo empleado</button><button class="btn btn-o btn-sm" onclick="openImport()">&#128229; Importar</button><button class="btn btn-o btn-sm" onclick="openSociedades()">&#127963; Sociedades</button><button class="btn btn-o btn-sm" onclick="openGestionDespachos()">&#127970; Despachos</button><button class="btn btn-o btn-sm" onclick="openReports()">&#128202; Informes</button>
       <button class="btn btn-g btn-sm" onclick="saveAll()">&#128190; Guardar</button>
       <button class="btn btn-o btn-sm" onclick="doLogout()" title="Cerrar sesion">Salir</button>
     </div>
@@ -448,6 +448,7 @@ if(storedVer && storedVer !== htmlVer){
       <div class="rep-card" onclick="genReport('bbdd')"><div class="rep-icon">&#128203;</div><div><div class="rep-name">BBDD completa</div><div class="rep-desc">Todos los datos de empleados</div></div></div>
       <div class="rep-card" onclick="genReport('consecutivos')"><div class="rep-icon">&#128290;</div><div><div class="rep-name">Consecutivos</div><div class="rep-desc">N&ordm; de registro por sociedad: huecos, repetidos y orden</div></div></div>
       <div class="rep-card" onclick="closeModal('MREP');openReordenar()"><div class="rep-icon">&#128257;</div><div><div class="rep-name">Reordenar consecutivos</div><div class="rep-desc">Numerar cada sociedad desde el .0 por antig&uuml;edad</div></div></div>
+      <div class="rep-card" onclick="closeModal('MREP');descargarCopia()"><div class="rep-icon">&#128190;</div><div><div class="rep-name">Copia de seguridad</div><div class="rep-desc">Todo el portal en un archivo (guárdalo en tu PC, nunca en GitHub)</div></div></div>
       <div class="rep-card" onclick="genReport('historial')"><div class="rep-icon">&#128336;</div><div><div class="rep-name">Historial cambios</div><div class="rep-desc">Modificaciones registradas</div></div></div>
     </div>
     <div class="ma"><button class="btn btn-o" onclick="closeModal('MREP')">Cerrar</button></div>
@@ -662,6 +663,120 @@ function migrarSeparaciones(){
     nu.historial.push({id:(t+1)+'',fecha:hoy,campo:'Fichas separadas',anterior:'Compartía datos con su ficha de '+socOt,nuevo:'Ficha propia de '+socNu+' desde '+fd(desde)+(movidos?' ('+movidos+' registros desde esa fecha pasan a esta ficha)':''),usuario:USER});
   });
   return hecho;
+}
+
+// ---------- Sociedades: datos de cada una y resumen de plantilla ----------
+var SOC_LARGO={1:'ASCENT LEGAL STRATEGIES SOCIEDAD LIM',2:'ASESORÍA BOWIE, S.L',3:'CENTRO DE FORMACION EDUCAR SIN FRONTERAS',4:'DESKO HISPANOAMERICANA CORPORATION S',5:'QUANTUM LEGAL SERVICES, SOCIEDAD LIM'};
+var SOC_FILTRO={1:'ASCENT',2:'BOWIE',3:'EDUCAR',4:'DESKO',5:'QUANTUM'};
+var SOC_CAMPOS=[['razon','Razón social'],['cif','CIF'],['ccc','Cuentas de cotización','area','Una por línea. Puedes añadir el centro: 28/1234567/89 - Usera 53'],
+  ['representante','Representante legal'],['dom_social','Domicilio social','area'],['dom_fiscal','Domicilio fiscal','area'],['notas','Notas','area']];
+var _socSel=1, _socVista='ACTIVO';
+function datosSoc(pf){
+  var raw=ST['_config']&&ST['_config'].edits&&ST['_config'].edits['soc_'+pf];
+  if(!raw) return {};
+  try{ var o=JSON.parse(raw); return (o&&typeof o==='object')?o:{}; }catch(x){ return {}; }
+}
+function socDeFicha(e){ return SOC_PFX[getField(e,ST[e.dni]||{},'sociedad')||e.sociedad||'']||0; }
+function cuentaSoc(){
+  var c={}; [1,2,3,4,5,0].forEach(function(p){ c[p]={ACTIVO:0,IT:0,BAJA:0,total:0}; });
+  EMPS_BASE.forEach(function(e){ var p=socDeFicha(e), est=getEstado(e); c[p].total++; if(c[p][est]!==undefined) c[p][est]++; });
+  return c;
+}
+function filtrarListaSoc(pf){
+  cF=SOC_FILTRO[pf]||'ALL'; cF2=(_socVista==='ACTIVO')?'ACT':(_socVista==='BAJA')?'BAJ':(_socVista==='IT')?'IT':'';
+  document.querySelectorAll('.fb').forEach(function(b){ var f=b.getAttribute('data-f'); b.classList.toggle('on', f===cF || (cF2!=='' && f===cF2)); });
+  var q=document.getElementById('SRCH'); if(q) q.value='';
+  renderList();
+}
+function openSociedades(pf, vista){
+  if(pf) _socSel=pf; if(vista) _socVista=vista;
+  cDni=null;
+  var det=document.getElementById('DET'), c=cuentaSoc(), d=datosSoc(_socSel), pfS=_socSel;
+  var card='background:var(--s2,rgba(127,127,127,.06));border:1px solid var(--b);border-radius:8px;padding:.6rem .7rem;cursor:pointer';
+  var h='<div style="padding:1rem 1.2rem;max-width:1100px">';
+  h+='<div style="display:flex;align-items:baseline;gap:.6rem;margin-bottom:.8rem"><h2 style="font-size:1.05rem;margin:0">&#127963; Sociedades</h2><span style="font-size:.75rem;color:var(--mu)">Pulsa una sociedad para ver su plantilla y sus datos</span></div>';
+  h+='<div id="SOC-CARDS" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:.5rem;margin-bottom:1rem">';
+  var tot={ACTIVO:0,IT:0,BAJA:0};
+  [1,2,3,4,5].forEach(function(p){
+    var x=c[p]; tot.ACTIVO+=x.ACTIVO; tot.IT+=x.IT; tot.BAJA+=x.BAJA;
+    var sel=(p===pfS)?';border-color:var(--r);box-shadow:0 0 0 1px var(--r) inset':'';
+    h+='<div class="soc-card" data-pf="'+p+'" style="'+card+sel+'" onclick="openSociedades('+p+')">'+
+      '<div style="font-weight:600;font-size:.82rem">'+escH(NOM_SOC[p])+'</div>'+
+      '<div style="font-size:1.6rem;font-weight:700;color:var(--success);line-height:1.2" class="soc-act">'+x.ACTIVO+'</div>'+
+      '<div style="font-size:.7rem;color:var(--mu)">activos'+(x.IT?' &middot; <span style="color:var(--pu)">'+x.IT+' en IT</span>':'')+' &middot; '+x.BAJA+' bajas</div></div>';
+  });
+  h+='<div style="'+card.replace('cursor:pointer','cursor:default')+'"><div style="font-weight:600;font-size:.82rem">Total grupo</div><div style="font-size:1.6rem;font-weight:700;line-height:1.2" id="SOC-TOT">'+tot.ACTIVO+'</div><div style="font-size:.7rem;color:var(--mu)">activos'+(tot.IT?' &middot; '+tot.IT+' en IT':'')+' &middot; '+tot.BAJA+' bajas</div></div>';
+  h+='</div>';
+  if(c[0].total) h+='<div style="font-size:.74rem;color:var(--dg);margin:-.5rem 0 .8rem">&#9888; '+c[0].total+' fichas sin una sociedad reconocida.</div>';
+  // datos de la sociedad
+  h+='<div style="display:grid;grid-template-columns:minmax(260px,1fr) 2fr;gap:1rem;align-items:start">';
+  h+='<div style="border:1px solid var(--b);border-radius:8px;padding:.75rem .85rem"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem"><div style="font-weight:600;font-size:.85rem">Datos de '+escH(NOM_SOC[pfS])+'</div><div style="display:flex;gap:.3rem"><button class="btn btn-o btn-sm" onclick="copiarDatosSoc('+pfS+')">Copiar</button><button class="btn btn-r btn-sm" id="SOC-EDIT" onclick="editarSoc('+pfS+')">Editar</button></div></div>';
+  SOC_CAMPOS.forEach(function(f){
+    var v=d[f[0]]||'';
+    h+='<div style="margin-bottom:.45rem"><div style="font-size:.68rem;color:var(--mu);text-transform:uppercase;letter-spacing:.03em">'+escH(f[1])+'</div><div class="soc-dato" data-k="'+f[0]+'" style="font-size:.8rem;white-space:pre-wrap;'+(v?'':'color:var(--mu);font-style:italic')+'">'+(v?escH(v):'Sin rellenar')+'</div></div>';
+  });
+  if(d.actualizado) h+='<div style="font-size:.68rem;color:var(--mu);margin-top:.4rem">Actualizado el '+escH(d.actualizado)+(d.usuario?' por '+escH(d.usuario):'')+'</div>';
+  h+='</div>';
+  // plantilla
+  var vistas=[['ACTIVO','Activos'],['IT','En IT'],['BAJA','Bajas'],['TODOS','Todos']];
+  h+='<div><div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-bottom:.5rem;align-items:center"><div style="font-weight:600;font-size:.85rem;margin-right:.4rem">Plantilla de '+escH(NOM_SOC[pfS])+'</div>';
+  vistas.forEach(function(v){ h+='<button class="btn btn-sm '+(v[0]===_socVista?'btn-r':'btn-o')+'" onclick="openSociedades(null,\''+v[0]+'\')">'+v[1]+'</button>'; });
+  h+='</div>';
+  var lista=EMPS_BASE.filter(function(e){ return socDeFicha(e)===pfS && (_socVista==='TODOS' || getEstado(e)===_socVista); });
+  lista.sort(function(a,b){ var x=numPartes(numReg(a)), y=numPartes(numReg(b)); return (x?x.n:1e9)-(y?y.n:1e9); });
+  var th='style="text-align:left;padding:.3rem .45rem;border-bottom:1px solid var(--b);color:var(--mu);font-weight:600;position:sticky;top:0;background:var(--m)"';
+  var td='style="padding:.28rem .45rem;border-bottom:1px solid var(--b)"';
+  h+='<div style="font-size:.72rem;color:var(--mu);margin-bottom:.3rem">'+lista.length+' personas</div>';
+  h+='<div style="max-height:62vh;overflow:auto;border:1px solid var(--b);border-radius:8px"><table id="SOC-T" style="width:100%;border-collapse:collapse;font-size:.76rem"><tr><th '+th+'>Nº</th><th '+th+'>Nombre</th><th '+th+'>Puesto</th><th '+th+'>Despacho</th><th '+th+'>Alta</th><th '+th+'>Estado</th></tr>';
+  lista.forEach(function(e,i){
+    var s2=ST[e.dni]||{};
+    h+='<tr class="soc-fila" style="cursor:pointer" onclick="selEmp(_SOC_LISTA['+i+'].dni,_SOC_LISTA['+i+'].archivo)"><td '+td+'>'+escH(numReg(e))+'</td><td '+td+'>'+escH(getField(e,s2,'nombre')||e.nombre)+'</td><td '+td+'>'+escH(getField(e,s2,'puesto')||'')+'</td><td '+td+'>'+escH(getField(e,s2,'despacho')||'')+'</td><td '+td+'>'+escH(fd(getField(e,s2,'inicio')||e.inicio))+'</td><td '+td+'>'+escH(getEstado(e))+'</td></tr>';
+  });
+  if(!lista.length) h+='<tr><td '+td+' colspan="6" style="color:var(--mu);padding:.6rem">Nadie en esta vista.</td></tr>';
+  h+='</table></div></div></div></div>';
+  window._SOC_LISTA=lista;
+  det.innerHTML=h;
+  filtrarListaSoc(pfS);
+}
+function editarSoc(pf){
+  var d=datosSoc(pf), m=document.getElementById('MSOC');
+  if(!m){ m=document.createElement('div'); m.className='mo'; m.id='MSOC'; document.body.appendChild(m); }
+  var h='<div class="md" style="width:560px"><h3>Datos de '+escH(NOM_SOC[pf])+'</h3>';
+  SOC_CAMPOS.forEach(function(f){
+    h+='<div class="fg"><label>'+escH(f[1])+'</label>';
+    if(f[2]==='area') h+='<textarea id="SOC-'+f[0]+'" rows="'+(f[0]==='ccc'?4:2)+'" style="width:100%;resize:vertical" placeholder="'+escH(f[3]||'')+'">'+escH(d[f[0]]||'')+'</textarea>';
+    else h+='<input type="text" id="SOC-'+f[0]+'" value="'+escH(d[f[0]]||(f[0]==='razon'?SOC_LARGO[pf]:''))+'">';
+    h+='</div>';
+  });
+  h+='<div style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.6rem"><button class="btn btn-o" onclick="closeModal(\'MSOC\')">Cancelar</button><button class="btn btn-r" id="SOC-SAVE" onclick="guardarSoc('+pf+')">Guardar</button></div></div>';
+  m.innerHTML=h; m.classList.add('open');
+}
+function guardarSoc(pf){
+  var antes=datosSoc(pf), d={};
+  SOC_CAMPOS.forEach(function(f){ var el=document.getElementById('SOC-'+f[0]); d[f[0]]=el?String(el.value||'').trim():''; });
+  var cambio=SOC_CAMPOS.some(function(f){ return (antes[f[0]]||'')!==d[f[0]]; });
+  closeModal('MSOC');
+  if(!cambio) return;
+  d.actualizado=new Date().toLocaleDateString('es-ES'); d.usuario=USER;
+  if(!ST['_config']) ST['_config']={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+  if(!ST['_config'].edits) ST['_config'].edits={};
+  ST['_config'].edits['soc_'+pf]=JSON.stringify(d);
+  saveAll();
+  openSociedades(pf);
+}
+function copiarDatosSoc(pf){
+  var d=datosSoc(pf), t=NOM_SOC[pf]+'\n';
+  SOC_CAMPOS.forEach(function(f){ if(d[f[0]]) t+=f[1]+': '+d[f[0]]+'\n'; });
+  function viejo(){ var ta=document.createElement('textarea'); ta.value=t; document.body.appendChild(ta); ta.select(); try{ document.execCommand('copy'); }catch(x){} document.body.removeChild(ta); }
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(function(){ showSaved('Copiado ✓'); },function(){ viejo(); showSaved('Copiado ✓'); }); else { viejo(); showSaved('Copiado ✓'); } }catch(x){ viejo(); }
+}
+// Copia de seguridad: todo lo que hay en el portal, en un archivo para guardar en el ordenador
+function descargarCopia(){
+  var copia={tipo:'copia-portal-rrhh', version:PORTAL_VERSION, fecha:new Date().toISOString(), empleados:EMPS_BASE.length, estado:ST, base:EMPS_BASE};
+  var blob=new Blob([JSON.stringify(copia)],{type:'application/json'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download='COPIA_portal_rrhh_'+new Date().toLocaleDateString('es-ES').replace(/\//g,'-')+'.json';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
 }
 
 // ---------- Reordenar consecutivos ----------
@@ -973,7 +1088,7 @@ var editOldVal = null;
 // ============================================================
 // INIT
 // ============================================================
-var PORTAL_VERSION = 'v3.6';
+var PORTAL_VERSION = 'v3.7';
 var LSK_PEND = 'da_rrhh_pending';
 var _snap = {};            // ultimo estado visto en Supabase, por clave (JSON)
 var _remoteLoaded = false; // ya se ha leido Supabase en esta sesion
@@ -1631,11 +1746,10 @@ function mF(e){
   else if(cF==='DA') {
     return (ges(e.dni).disciplinario||[]).some(function(d){return d.estado==='abierto';});
   }
-  else if(cF==='ASCENT') { socOk=e.sociedad.indexOf('ASCENT')>=0; }
-  else if(cF==='BOWIE') { socOk=e.sociedad.indexOf('BOWIE')>=0; }
-  else if(cF==='EDUCAR') { socOk=e.sociedad.indexOf('EDUCAR')>=0||e.sociedad.indexOf('FORMACION')>=0; }
-  else if(cF==='DESKO') { socOk=e.sociedad.indexOf('DESKO')>=0; }
-  else if(cF==='QUANTUM') { socOk=e.sociedad.indexOf('QUANTUM')>=0; }
+  else if(['ASCENT','BOWIE','EDUCAR','DESKO','QUANTUM'].indexOf(cF)>=0) {
+    var sEf=getField(e,ges(e.dni),'sociedad')||e.sociedad||'';
+    socOk = cF==='EDUCAR' ? (sEf.indexOf('EDUCAR')>=0||sEf.indexOf('FORMACION')>=0) : sEf.indexOf(cF)>=0;
+  }
   // Secondary filter (estado)
   if(cF2==='ACT') estOk=estOk&&est==='ACTIVO';
   else if(cF2==='BAJ') estOk=estOk&&est==='BAJA';
