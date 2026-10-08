@@ -607,6 +607,63 @@ function avisarChoques(cambios){
   var txt=cambios.map(function(c){ return '· '+c.nombre+': pasa del '+c.viejo+' al '+c.nuevo; }).join('\n');
   setTimeout(function(){ alert('Desde otro ordenador se ha dado de alta a otra persona a la vez y había cogido el mismo número.\n\nPara que no se repita:\n'+txt); }, 50);
 }
+// ---------- Fichas de la base que compartian datos por tener el mismo DNI ----------
+// Correccion puntual: en la base, la ficha 2.36 (sociedad Desko) es el contrato en Desko de una persona que antes
+// estuvo en Bowie (ficha 2.13). Al compartir DNI compartian datos, y un "Nuevo contrato" de agosto dejo las dos en
+// Bowie. Aqui la ficha de Desko pasa a tener su propia clave y sus propios datos. (Sin datos personales en el codigo.)
+var SEPARACIONES=[{archivo:'2.36', otraArchivo:'2.13', socBase:'DESKO'}];
+var _separadas=[];
+function aplicarSeparaciones(){
+  _separadas=[];
+  SEPARACIONES.forEach(function(sp){
+    EMPS_BASE.forEach(function(e){
+      if(e.dni_real || String(e.archivo)!==sp.archivo || String(e.sociedad||'').indexOf(sp.socBase)<0) return;
+      var otra=null;
+      EMPS_BASE.forEach(function(x){ if(x!==e && normDni(x.dni)===normDni(e.dni) && String(x.archivo)===sp.otraArchivo) otra=x; });
+      if(!otra) return;
+      var viejo=e.dni, nueva=e.dni+'@'+(SOC_PFX[e.sociedad]||0);
+      e.dni_real=viejo; e.dni=nueva;
+      _separadas.push({e:e, otra:otra, viejo:viejo, nueva:nueva});
+    });
+  });
+}
+// Una sola vez: los datos de la epoca de Desko pasan a la ficha de Desko; la de Bowie vuelve a sus datos de Bowie
+function migrarSeparaciones(){
+  var hecho=false;
+  _separadas.forEach(function(sp){
+    if(!ST['_config']) ST['_config']={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+    if(!ST['_config'].edits) ST['_config'].edits={};
+    var flag='separada_'+sp.e.archivo;
+    if(ST['_config'].edits[flag]) return;
+    var old=ST[sp.viejo];
+    ST['_config'].edits[flag]=new Date().toISOString().substring(0,10);
+    hecho=true;
+    if(!old) return;
+    var desde=isoFecha(sp.e.inicio), nu=ges(sp.nueva);
+    var ed=JSON.parse(JSON.stringify(old.edits||{}));
+    Object.keys(ed).forEach(function(k){ if(/^nreg_/.test(k) || ['sociedad','baja','estado','motivo_baja','dni_anterior'].indexOf(k)>=0) delete ed[k]; });
+    var nuEd=nu.edits||{}; for(var k in ed){ if(nuEd[k]===undefined) nuEd[k]=ed[k]; } nu.edits=nuEd;
+    if(!nu.cuenta) nu.cuenta=old.cuenta||'';
+    var movidos=0;
+    function mover(lista, campo){
+      var q=[], r=[];
+      (old[lista]||[]).forEach(function(x){ var f=isoFecha(x&&x[campo]); if(desde && f && f>=desde) q.push(x); else r.push(x); });
+      old[lista]=r; nu[lista]=(nu[lista]||[]).concat(q); movidos+=q.length;
+    }
+    mover('records','f1'); mover('disciplinario','fecha_hecho'); mover('notas','fecha');
+    if(old.edits){
+      ['inicio','tipo_contrato','sociedad','jornada','salario','salario_mensual','periodo_prueba_fin','fin_contrato','estado','horas'].forEach(function(k){ delete old.edits[k]; });
+      delete old.edits['nreg_'+sp.e.archivo];
+    }
+    var hoy=new Date().toLocaleDateString('es-ES'), t=Date.now();
+    var socNu=sA(sp.e.sociedad||''), socOt=sA(sp.otra.sociedad||'');
+    if(!old.historial) old.historial=[]; if(!nu.historial) nu.historial=[];
+    old.historial.push({id:t+'',fecha:hoy,campo:'Fichas separadas',anterior:'Compartía datos con su ficha de '+socNu,nuevo:'Esta ficha queda solo con su contrato de '+socOt,usuario:USER});
+    nu.historial.push({id:(t+1)+'',fecha:hoy,campo:'Fichas separadas',anterior:'Compartía datos con su ficha de '+socOt,nuevo:'Ficha propia de '+socNu+' desde '+fd(desde)+(movidos?' ('+movidos+' registros desde esa fecha pasan a esta ficha)':''),usuario:USER});
+  });
+  return hecho;
+}
+
 // ---------- Reordenar consecutivos ----------
 // Regla: cada sociedad se numera desde el .0, de la persona mas antigua a la mas reciente.
 //  - quien ha estado en dos sociedades tiene un numero en cada una, segun su antiguedad en cada una
@@ -916,7 +973,7 @@ var editOldVal = null;
 // ============================================================
 // INIT
 // ============================================================
-var PORTAL_VERSION = 'v3.5';
+var PORTAL_VERSION = 'v3.6';
 var LSK_PEND = 'da_rrhh_pending';
 var _snap = {};            // ultimo estado visto en Supabase, por clave (JSON)
 var _remoteLoaded = false; // ya se ha leido Supabase en esta sesion
@@ -1140,12 +1197,14 @@ function doSetupImport(){
 }
 function startApp(lista){
   EMPS_BASE = JSON.parse(JSON.stringify(lista));
+  aplicarSeparaciones();
   EXTRA_EMPS = [];
   _appStarted = true;
   document.getElementById('LS').style.display='none';
   document.getElementById('APP').style.display='flex';
   loadFromSupabase(function(){
     mergePreloaded(_remoteLoaded);
+    if(_remoteLoaded) migrarSeparaciones();
     syncExtra(); applyDniAliases(); loadDespachos();
     renderList(); updStats(); buildAlerts();
     startAutoSync();
