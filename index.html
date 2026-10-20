@@ -270,7 +270,7 @@ if(storedVer && storedVer !== htmlVer){
     <span class="ttitle">Portal RRHH</span><span id="PVER" style="font-size:10px;opacity:.55;margin-left:8px"></span>
     <div class="tright">
       <span class="sync-dot" id="SDOT"></span><span class="tsave" id="SLBL"></span>
-      <button class="btn btn-r btn-sm" onclick="openNewEmp()">&#43; Nuevo empleado</button><button class="btn btn-o btn-sm" onclick="openImport()">&#128229; Importar</button><button class="btn btn-o btn-sm" onclick="openSociedades()">&#127963; Sociedades</button><button class="btn btn-o btn-sm" onclick="openGestionDespachos()">&#127970; Despachos</button><button class="btn btn-o btn-sm" onclick="openReports()">&#128202; Informes</button>
+      <button class="btn btn-r btn-sm" onclick="openNewEmp()">&#43; Nuevo empleado</button><button class="btn btn-o btn-sm" onclick="openImport()">&#128229; Importar</button><button class="btn btn-o btn-sm" onclick="openSociedades()">&#127963; Sociedades</button><button class="btn btn-o btn-sm" onclick="openGestionDespachos()">&#127970; Despachos</button><button class="btn btn-o btn-sm" onclick="openMapa()">&#128506; Mapa despachos</button><button class="btn btn-o btn-sm" onclick="openReports()">&#128202; Informes</button>
       <button class="btn btn-g btn-sm" onclick="saveAll()">&#128190; Guardar</button>
       <button class="btn btn-o btn-sm" onclick="doLogout()" title="Cerrar sesion">Salir</button>
     </div>
@@ -1088,7 +1088,7 @@ var editOldVal = null;
 // ============================================================
 // INIT
 // ============================================================
-var PORTAL_VERSION = 'v3.7';
+var PORTAL_VERSION = 'v3.8';
 var LSK_PEND = 'da_rrhh_pending';
 var _snap = {};            // ultimo estado visto en Supabase, por clave (JSON)
 var _remoteLoaded = false; // ya se ha leido Supabase en esta sesion
@@ -3554,6 +3554,671 @@ function saveNewEmp() {
   buildAlerts();
   selEmp(dni);
 }
+</script>
+<script>
+// ============================================================
+// MAPA DE DESPACHOS + VACANTES  (v3.8)
+// Datos: campos de la ficha  sit_mapa / cubre_a / nota_mapa / mapa_incluir
+//        vacantes en ST['_config'].vacantes  [{id,despacho,puesto,prioridad,nota,candidato,fecha_inc,estado,...}]
+// ============================================================
+var MAPA_SITS=['BAJA MÉDICA CORTA','BAJA MÉDICA LARGA','PROVISIONAL','EN FORMACIÓN','TELETRABAJO TEMPORAL'];
+var MAPA_DEPS=[
+  ['JURÍDICO','#ddeafb','#1f4e79',/ABOGAD|JUR[IÍ]DIC|LETRAD/],
+  ['COMERCIAL','#fde4d3','#843c0c',/COMERCIAL|VENTAS/],
+  ['ADMINISTRACIÓN Y GESTIÓN','#e2efda','#375623',null],
+  ['MARKETING','#fff2cc','#7f6000',/MARKETING|\bCMO\b|PAID|FLYER|COMMUNITY|DISE[NÑ]/],
+  ['DIRECCIÓN Y RRHH','#fadadd','#833c4b',/RR\.?\s?HH|RECURSOS HUMANOS|SECRETARI|DIRECCI[OÓ]N|DIRECTOR(?!A)|GERENT/],
+  ['SERVICIOS GENERALES E IT','#ececec','#404040',/INFORM[AÁ]TIC|SERVICIOS GENERALES|LIMPIEZA|MANTENIM|\bIT\b|SISTEMAS/],
+  ['FORMACIÓN','#ede2f6','#5b2c83',/PROFESOR|DOCENTE|ACAD[EÉ]MIC|FORMACI[OÓ]N|DIRECTORA/]
+];
+var MAPA_ST={VAC:['#ffc7ce','#9c0006'],INC:['#c6efce','#006100'],PROV:['#ffeb9c','#9c5700'],AUS:['#ededed','#6e6e6e'],OTR:['#ddebf7','#1f4e79']};
+var DESPS_DEFECTO=(typeof DESPS!=='undefined')?DESPS.slice():[];
+var _MP={personas:[],vac:[],form:[]};
+
+function mpHoy(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+function mpCfg(){
+  if(!ST['_config']) ST['_config']={records:[],disciplinario:[],notas:[],historial:[],edits:{},cuenta:''};
+  if(!ST['_config'].edits) ST['_config'].edits={};
+  if(!Array.isArray(ST['_config'].vacantes)) ST['_config'].vacantes=[];
+  return ST['_config'];
+}
+function mpVacantes(){ return (ST['_config']&&Array.isArray(ST['_config'].vacantes))?ST['_config'].vacantes:[]; }
+function mpF(e,f){ return getField(e,ST[e.dni]||{},f)||e[f]||''; }
+function mpNorm(s){ return String(s||'').toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+function mpDep(puesto){
+  var p=mpNorm(puesto);
+  if(/DIRECTORA/.test(p) && !/COMERCIAL/.test(p)) return MAPA_DEPS[6];
+  for(var i=0;i<MAPA_DEPS.length;i++){ var d=MAPA_DEPS[i]; if(d[3] && d[3].test(p)) return d; }
+  return MAPA_DEPS[2];
+}
+function mpDepIdx(puesto){ return MAPA_DEPS.indexOf(mpDep(puesto)); }
+function mpEsMarketing(puesto){ return mpDep(puesto)[0]==='MARKETING'; }
+// Quien sale en el mapa: fichas no dadas de baja; Educar solo Marketing (salvo que se marque SI/NO a mano)
+function mpIncluida(e){
+  if(getEstado(e)==='BAJA') return false;
+  var m=mpF(e,'mapa_incluir');
+  if(m==='SÍ') return true; if(m==='NO') return false;
+  var pf=SOC_PFX[mpF(e,'sociedad')]||0;
+  if(pf===3 && !mpEsMarketing(mpF(e,'puesto'))) return false;
+  return true;
+}
+function mpSit(e){
+  var es2=ST[e.dni]||{}, s=getField(e,es2,'sit_mapa')||'', est=getEstado(e);
+  var ini=isoFecha(mpF(e,'inicio')), k='', t='';
+  if(ini && ini>mpHoy()){ k='INC'; t='INCORPORA '+fd(ini); }
+  else if(s){ t=s; k=(s==='PROVISIONAL')?'PROV':(/^BAJA/.test(s)?'AUS':'OTR'); }
+  else if(est==='IT'){ k='AUS'; t='BAJA MÉDICA (IT)'; }
+  else if(est && est!=='ACTIVO'){ k='AUS'; t=est; }
+  var extra=[], cub=getField(e,es2,'cubre_a'), nota=getField(e,es2,'nota_mapa');
+  if(cub) extra.push('cubre a '+cub); if(nota) extra.push(nota);
+  return {k:k, t:t, extra:extra.join(' · '), s:s};
+}
+function mpCalcular(){
+  var personas=[], vistos={};
+  EMPS_BASE.forEach(function(e){
+    if(!e||!e.dni) return; var key=e.dni+'|'+e.archivo; if(vistos[key]) return; vistos[key]=1;
+    if(!mpIncluida(e)) return;
+    var sit=mpSit(e);
+    personas.push({e:e, nombre:mpF(e,'nombre')||e.nombre, despacho:mpF(e,'despacho')||'SIN DESPACHO', puesto:mpF(e,'puesto')||'-', sit:sit, inicio:isoFecha(mpF(e,'inicio'))});
+  });
+  var vac=mpVacantes().filter(function(v){ return v && v.estado!=='CUBIERTA' && v.estado!=='CERRADA'; });
+  var form=personas.filter(function(p){ return p.sit.s==='EN FORMACIÓN'; });
+  _MP={personas:personas, vac:vac, form:form};
+  return _MP;
+}
+function mpVacClase(v){ return v.candidato ? 'INC' : 'VAC'; }
+function mpVacPrior(v){ return v.prioridad!=='NO PRIORITARIA'; }
+
+// ---------- VISTA ----------
+function openMapa(){
+  cDni=null;
+  var M=mpCalcular(), det=document.getElementById('DET');
+  var P=M.personas, V=M.vac;
+  var plantilla=P.filter(function(p){ return p.sit.k!=='INC'; }).length;
+  var vSin=V.filter(function(v){ return !v.candidato; });
+  var vPri=vSin.filter(mpVacPrior).length, vNo=vSin.length-vPri;
+  var incPers=P.filter(function(p){ return p.sit.k==='INC'; });
+  var incVac=V.filter(function(v){ return v.candidato; });
+  var aus=P.filter(function(p){ return p.sit.k==='AUS'; }).length;
+  var h='<div id="MAPA" style="padding:1rem 1.2rem">';
+  h+='<div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;margin-bottom:.8rem"><h2 style="font-size:1.05rem;margin:0">&#128506; Mapa de despachos</h2>';
+  h+='<span style="font-size:.74rem;color:var(--mu)">Fichas activas (sin Educar salvo Marketing) + vacantes</span><span style="margin-left:auto;display:flex;gap:.35rem;flex-wrap:wrap">';
+  h+='<button class="btn btn-r btn-sm" onclick="mpEditarVacante(null)">+ Nueva vacante</button>';
+  h+='<button class="btn btn-o btn-sm" onclick="mpExportar()">&#128229; Descargar informe Excel</button>';
+  if(!(ST['_config']&&ST['_config'].edits&&ST['_config'].edits.mapa_inicial)) h+='<button class="btn btn-g btn-sm" id="MP-INI" onclick="mpCargaInicial()">Cargar datos iniciales del Excel</button>';
+  h+='<button class="btn btn-o btn-sm" onclick="openMapa()">&#8635; Actualizar</button></span></div>';
+  // KPIs
+  function kpi(lab,val,bg,fg,sub){ return '<div style="background:'+bg+';color:'+fg+';border-radius:8px;padding:.55rem .7rem;min-width:130px;flex:1"><div style="font-size:.66rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase">'+lab+'</div><div style="font-size:1.7rem;font-weight:700;line-height:1.15">'+val+'</div>'+(sub?'<div style="font-size:.68rem;opacity:.85">'+sub+'</div>':'')+'</div>'; }
+  h+='<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:1rem">';
+  h+=kpi('Plantilla',plantilla,'#1f3864','#fff');
+  h+=kpi('Vacantes sin cubrir',vSin.length,'#c00000','#fff',vPri+' prioritarias · '+vNo+' no prioritarias');
+  h+=kpi('Incorporaciones pendientes',incPers.length+incVac.length,MAPA_ST.INC[0],MAPA_ST.INC[1],incVac.length+' candidatos sin ficha aún');
+  h+=kpi('En formación',M.form.length,MAPA_ST.OTR[0],MAPA_ST.OTR[1]);
+  h+=kpi('De baja / ausentes',aus,MAPA_ST.AUS[0],'#444');
+  h+='</div>';
+  // Puestos a cubrir + formacion
+  var th='style="text-align:left;padding:.3rem .45rem;border-bottom:2px solid var(--b);color:var(--mu);font-weight:600;font-size:.7rem"';
+  var td='style="padding:.3rem .45rem;border-bottom:1px solid var(--b);vertical-align:top"';
+  var filas=[];
+  vSin.filter(mpVacPrior).forEach(function(v){ filas.push({o:0,v:v}); });
+  vSin.filter(function(v){ return !mpVacPrior(v); }).forEach(function(v){ filas.push({o:1,v:v}); });
+  incVac.forEach(function(v){ filas.push({o:2,v:v}); });
+  incPers.forEach(function(p){ filas.push({o:3,p:p}); });
+  filas.sort(function(a,b){ if(a.o!==b.o) return a.o-b.o; var da=a.v?a.v.despacho:a.p.despacho, db=b.v?b.v.despacho:b.p.despacho; return String(da).localeCompare(String(db)); });
+  window._MP_FILAS=filas;
+  h+='<div style="display:grid;grid-template-columns:minmax(0,2.2fr) minmax(260px,1fr);gap:1rem;align-items:start;margin-bottom:1.2rem">';
+  h+='<div style="border:1px solid var(--b);border-radius:8px;overflow:hidden"><div style="background:#c00000;color:#fff;font-weight:600;padding:.45rem .7rem;font-size:.85rem">Puestos a cubrir <span style="font-weight:400;font-size:.72rem;opacity:.9">· vacantes y candidatos confirmados (pulsa una fila para editarla)</span></div>';
+  h+='<table id="MP-PEND" style="width:100%;border-collapse:collapse;font-size:.76rem"><tr><th '+th+'>Estado</th><th '+th+'>Despacho</th><th '+th+'>Puesto</th><th '+th+'>Persona</th><th '+th+'>Incorporación</th><th '+th+'>Nota</th></tr>';
+  if(!filas.length) h+='<tr><td '+td+' colspan="6" style="color:var(--mu)">No hay vacantes abiertas.</td></tr>';
+  filas.forEach(function(f,i){
+    var est,c,des,pue,per,fec,nota,click;
+    if(f.v){
+      var v=f.v;
+      c=f.o===0?MAPA_ST.VAC:(f.o===1?['#fce4d6','#843c0c']:MAPA_ST.INC);
+      est=f.o===0?'PRIORITARIA · sin candidato':(f.o===1?'NO PRIORITARIA · sin candidato':'CUBIERTA · candidato confirmado');
+      des=v.despacho; pue=v.puesto; per=v.candidato||'—'; fec=v.candidato?(v.fecha_inc?fd(v.fecha_inc):'Por definir'):'—'; nota=v.nota||'';
+      click='mpEditarVacante(_MP_FILAS['+i+'].v.id)';
+    } else {
+      var p=f.p; c=MAPA_ST.INC; est='CUBIERTA · ficha creada';
+      des=p.despacho; pue=p.puesto; per=p.nombre; fec=fd(p.inicio); nota=p.sit.extra;
+      click='selEmp(_MP_FILAS['+i+'].p.e.dni,_MP_FILAS['+i+'].p.e.archivo)';
+    }
+    h+='<tr class="mp-fila" style="cursor:pointer;background:'+c[0]+';color:'+c[1]+'" onclick="'+click+'"><td '+td+'><b>'+escH(est)+'</b></td><td '+td+'>'+escH(des)+'</td><td '+td+'>'+escH(pue)+'</td><td '+td+'>'+escH(per)+'</td><td '+td+'>'+escH(fec)+'</td><td '+td+'>'+escH(nota)+'</td></tr>';
+  });
+  h+='</table></div>';
+  window._MP_FORM=M.form;
+  h+='<div style="border:1px solid var(--b);border-radius:8px;overflow:hidden"><div style="background:#1f4e79;color:#fff;font-weight:600;padding:.45rem .7rem;font-size:.85rem">En formación ('+M.form.length+') <span style="font-weight:400;font-size:.72rem;opacity:.9">· disponibles para cubrir vacantes</span></div>';
+  if(!M.form.length) h+='<div style="padding:.6rem .7rem;color:var(--mu);font-size:.76rem">Nadie en formación. Se marca desde la ficha (Datos laborales → Mapa de despachos).</div>';
+  M.form.forEach(function(p,i){
+    h+='<div style="display:flex;align-items:center;gap:.5rem;padding:.4rem .7rem;border-bottom:1px solid var(--b);background:'+MAPA_ST.OTR[0]+'"><div style="flex:1;cursor:pointer" onclick="selEmp(_MP_FORM['+i+'].e.dni,_MP_FORM['+i+'].e.archivo)"><div style="font-weight:600;font-size:.78rem;color:#1f4e79">'+escH(p.nombre)+'</div><div style="font-size:.68rem;color:var(--mu)">'+escH(p.puesto)+' · desde '+escH(fd(p.inicio))+' · '+escH(p.despacho)+'</div></div><button class="btn btn-bl btn-xs" onclick="mpAsignarFormacion('+i+')">Asignar a vacante</button></div>';
+  });
+  h+='</div></div>';
+  // leyenda
+  function chip(t,bg,fg){ return '<span style="display:inline-block;background:'+bg+';color:'+fg+';border-radius:4px;padding:.12rem .45rem;font-size:.66rem;font-weight:600;margin:0 .25rem .25rem 0">'+t+'</span>'; }
+  h+='<div style="margin-bottom:.7rem;font-size:.7rem;color:var(--mu)">'+chip('Vacante',MAPA_ST.VAC[0],MAPA_ST.VAC[1])+chip('Incorporación / candidato',MAPA_ST.INC[0],MAPA_ST.INC[1])+chip('Provisional',MAPA_ST.PROV[0],MAPA_ST.PROV[1])+chip('Baja / ausente',MAPA_ST.AUS[0],'#444')+chip('Formación / teletrabajo',MAPA_ST.OTR[0],MAPA_ST.OTR[1])+chip('Cabecera roja = vacante prioritaria','#c00000','#fff')+'&nbsp;&nbsp;Puesto: ';
+  MAPA_DEPS.forEach(function(d){ h+=chip(d[0],d[1],d[2]); });
+  h+='</div>';
+  // fichas por despacho
+  var porDesp={};
+  P.forEach(function(p){ (porDesp[p.despacho]=porDesp[p.despacho]||{p:[],v:[]}).p.push(p); });
+  V.forEach(function(v){ var d=v.despacho||'SIN DESPACHO'; (porDesp[d]=porDesp[d]||{p:[],v:[]}).v.push(v); });
+  var orden=DESPS.filter(function(d){ return porDesp[d]; });
+  Object.keys(porDesp).forEach(function(d){ if(orden.indexOf(d)<0) orden.push(d); });
+  window._MP_CARD=[];
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:.8rem">';
+  orden.forEach(function(d){
+    var g=porDesp[d];
+    var gente=g.p.filter(function(p){ return p.sit.k!=='INC'; });
+    gente.sort(function(a,b){ var x=mpDepIdx(a.puesto)-mpDepIdx(b.puesto); if(x) return x; x=String(a.puesto).localeCompare(String(b.puesto)); if(x) return x; return String(a.nombre).localeCompare(String(b.nombre)); });
+    var inc=g.p.filter(function(p){ return p.sit.k==='INC'; });
+    var cand=g.v.filter(function(v){ return v.candidato; });
+    var vs=g.v.filter(function(v){ return !v.candidato; }).sort(function(a,b){ return (mpVacPrior(a)?0:1)-(mpVacPrior(b)?0:1); });
+    var pri=vs.filter(mpVacPrior).length;
+    var nAus=gente.filter(function(p){ return p.sit.k==='AUS'; }).length, nForm=gente.filter(function(p){ return p.sit.s==='EN FORMACIÓN'; }).length;
+    h+='<div class="mp-card" style="border:1px solid var(--b);border-radius:8px;overflow:hidden;background:var(--m)">';
+    h+='<div style="background:'+(pri?'#c00000':'#1f3864')+';color:#fff;padding:.4rem .65rem;font-weight:700;font-size:.88rem">'+escH(d)+'</div>';
+    h+='<div style="background:#d9e1f2;color:#1f3864;padding:.25rem .65rem;font-size:.68rem;font-weight:600">Plantilla: '+gente.length+(nAus?' · Ausentes: '+nAus:'')+(nForm?' · En formación: '+nForm:'')+' · Incorporaciones: '+(inc.length+cand.length)+' · Vacantes: '+vs.length+(vs.length?' ('+pri+' prioritarias)':'')+'</div>';
+    h+='<table style="width:100%;border-collapse:collapse;font-size:.74rem">';
+    function fila(nombre,puesto,txt,k,click){
+      var c=k?MAPA_ST[k]:null, dep=mpDep(puesto);
+      var st=c?'background:'+c[0]+';color:'+c[1]:'';
+      return '<tr style="'+st+(click?';cursor:pointer':'')+'"'+(click?' onclick="'+click+'"':'')+'><td style="padding:.22rem .5rem;border-bottom:1px solid var(--b);'+(k==='VAC'?'font-weight:700':'')+'">'+escH(nombre)+'</td>'+
+        '<td style="padding:.22rem .4rem;border-bottom:1px solid var(--b)"><span style="background:'+dep[1]+';color:'+dep[2]+';border-radius:3px;padding:.05rem .35rem;font-size:.66rem;font-weight:600;white-space:nowrap">'+escH(puesto)+'</span></td>'+
+        '<td style="padding:.22rem .5rem;border-bottom:1px solid var(--b);font-size:.68rem">'+escH(txt)+'</td></tr>';
+    }
+    gente.concat(inc).forEach(function(p){
+      var i=window._MP_CARD.push(p)-1;
+      var txt=[p.sit.t,p.sit.extra].filter(function(x){return x;}).join(' · ');
+      h+=fila(p.nombre,p.puesto,txt,p.sit.k,'selEmp(_MP_CARD['+i+'].e.dni,_MP_CARD['+i+'].e.archivo)');
+    });
+    cand.concat(vs).forEach(function(v){
+      var i=window._MP_CARD.push(v)-1;
+      var txt=v.candidato?('CANDIDATO · incorpora '+(v.fecha_inc?fd(v.fecha_inc):'(fecha pte)')):('VACANTE · '+(mpVacPrior(v)?'prioritaria':'no prioritaria'));
+      if(v.nota) txt+=' · '+v.nota;
+      h+=fila(v.candidato||'VACANTE',v.puesto,txt,v.candidato?'INC':'VAC','mpEditarVacante(_MP_CARD['+i+'].id)');
+    });
+    if(!gente.length && !inc.length && !g.v.length) h+='<tr><td style="padding:.4rem .5rem;color:var(--mu)">Sin personal</td></tr>';
+    h+='</table></div>';
+  });
+  h+='</div></div>';
+  det.innerHTML=h;
+}
+
+// ---------- VACANTES ----------
+function mpPuestosConocidos(){
+  var s={}; EMPS_BASE.forEach(function(e){ var p=mpF(e,'puesto'); if(p) s[p]=1; }); mpVacantes().forEach(function(v){ if(v.puesto) s[v.puesto]=1; });
+  return Object.keys(s).sort();
+}
+function mpModal(id,html,width){
+  var m=document.getElementById(id);
+  if(!m){ m=document.createElement('div'); m.className='mo'; m.id=id; document.body.appendChild(m); }
+  m.innerHTML='<div class="md" style="width:'+(width||520)+'px;max-height:90vh;overflow-y:auto">'+html+'</div>';
+  m.classList.add('open');
+  return m;
+}
+function mpEditarVacante(id, preset){
+  var v=null; mpVacantes().forEach(function(x){ if(x.id===id) v=x; });
+  v=v||preset||{despacho:'',puesto:'',prioridad:'PRIORITARIA',nota:'',candidato:'',fecha_inc:'',estado:'ABIERTA'};
+  window._MP_EDIT=id||null; window._MP_PRESET=preset||null;
+  var h='<h3>'+(id?'Editar vacante':'Nueva vacante')+'</h3>';
+  h+='<div class="fr2"><div class="fg"><label>Despacho</label><select id="MV-desp"><option value="">-- Selecciona --</option>';
+  var ds=DESPS.slice(); if(v.despacho && ds.indexOf(v.despacho)<0) ds.push(v.despacho);
+  ds.forEach(function(d){ h+='<option'+(d===v.despacho?' selected':'')+'>'+escH(d)+'</option>'; });
+  h+='</select></div><div class="fg"><label>Puesto</label><input id="MV-puesto" list="MV-pl" value="'+escH(v.puesto)+'" placeholder="ABOGADO/A, COMERCIAL..."><datalist id="MV-pl">';
+  mpPuestosConocidos().forEach(function(p){ h+='<option value="'+escH(p)+'">'; });
+  h+='</datalist></div></div>';
+  h+='<div class="fr2"><div class="fg"><label>Prioridad</label><select id="MV-prio"><option'+(v.prioridad!=='NO PRIORITARIA'?' selected':'')+'>PRIORITARIA</option><option'+(v.prioridad==='NO PRIORITARIA'?' selected':'')+'>NO PRIORITARIA</option></select></div>';
+  h+='<div class="fg"><label>Estado</label><select id="MV-est">';
+  [['ABIERTA','Abierta'],['CUBIERTA','Cubierta (ya incorporado)'],['CERRADA','Cerrada / anulada']].forEach(function(o){ h+='<option value="'+o[0]+'"'+((v.estado||'ABIERTA')===o[0]?' selected':'')+'>'+o[1]+'</option>'; });
+  h+='</select></div></div>';
+  h+='<div class="fg"><label>Nota (sale en el mapa)</label><input id="MV-nota" value="'+escH(v.nota)+'" placeholder="Jurídico · media jornada · sustituir a..."></div>';
+  h+='<div style="border:1px solid var(--b);border-radius:6px;padding:.55rem .65rem;margin:.4rem 0;background:rgba(63,185,80,.06)"><div style="font-size:.74rem;font-weight:600;margin-bottom:.35rem">Candidato confirmado (si ya hay alguien que se incorpora)</div>';
+  h+='<div class="fr2"><div class="fg"><label>Nombre</label><input id="MV-cand" value="'+escH(v.candidato)+'" placeholder="Vacío si aún no hay nadie"></div><div class="fg"><label>Fecha de incorporación</label><input type="date" id="MV-finc" value="'+escH(v.fecha_inc||'')+'"></div></div>';
+  h+='<div style="font-size:.68rem;color:var(--mu)">Cuando le crees la ficha con "+ Nuevo empleado", el portal te preguntará qué vacante cubre y la cerrará solo.</div></div>';
+  if(v.sustituye) h+='<div style="font-size:.7rem;color:var(--mu)">Generada al dar de baja a '+escH(v.sustituye)+'.</div>';
+  if(v.cubierta_por) h+='<div style="font-size:.7rem;color:var(--mu)">Cubierta por '+escH(v.cubierta_por)+(v.fecha_cierre?' el '+escH(v.fecha_cierre):'')+'.</div>';
+  h+='<div id="MV-err" style="color:var(--dg);font-size:.74rem;min-height:1rem"></div>';
+  h+='<div class="ma" style="display:flex;gap:.5rem;justify-content:flex-end">'+(id?'<button class="btn btn-o" style="margin-right:auto;color:var(--dg)" onclick="mpBorrarVacante()">Eliminar</button>':'')+'<button class="btn btn-o" onclick="closeModal(\'MVAC\')">Cancelar</button><button class="btn btn-r" id="MV-save" onclick="mpGuardarVacante()">Guardar</button></div>';
+  mpModal('MVAC',h,540);
+}
+function mpGuardarVacante(){
+  var g=function(i){ var el=document.getElementById(i); return el?String(el.value||'').trim():''; };
+  var d=g('MV-desp'), p=g('MV-puesto').toUpperCase();
+  if(!d||!p){ document.getElementById('MV-err').textContent='Despacho y puesto son obligatorios.'; return; }
+  var cfg=mpCfg(), id=window._MP_EDIT, v=null, i;
+  for(i=0;i<cfg.vacantes.length;i++) if(cfg.vacantes[i].id===id){ v=JSON.parse(JSON.stringify(cfg.vacantes[i])); break; }
+  var nuevo=!v;
+  if(nuevo){ v=Object.assign({}, window._MP_PRESET||{}); v.id='v'+Date.now().toString(36)+Math.random().toString(36).substring(2,7); v.creada=new Date().toLocaleDateString('es-ES'); v.usuario=USER; }
+  v.despacho=d; v.puesto=p; v.prioridad=g('MV-prio'); v.estado=g('MV-est'); v.nota=g('MV-nota'); v.candidato=g('MV-cand'); v.fecha_inc=g('MV-finc');
+  if(v.estado!=='ABIERTA' && !v.fecha_cierre) v.fecha_cierre=new Date().toLocaleDateString('es-ES');
+  if(nuevo) cfg.vacantes.push(v); else cfg.vacantes[i]=v;
+  closeModal('MVAC'); saveAll(); openMapa();
+}
+function mpBorrarVacante(){
+  if(!confirm('¿Eliminar esta vacante? Si se ha cubierto, mejor márcala como Cubierta o Cerrada.')) return;
+  var cfg=mpCfg(), id=window._MP_EDIT;
+  cfg.vacantes=cfg.vacantes.filter(function(v){ return v.id!==id; });
+  closeModal('MVAC'); saveAll(); openMapa();
+}
+function mpCrearVacante(v){
+  var cfg=mpCfg();
+  v.id='v'+Date.now().toString(36)+Math.random().toString(36).substring(2,7);
+  v.estado=v.estado||'ABIERTA'; v.prioridad=v.prioridad||'PRIORITARIA';
+  v.creada=new Date().toLocaleDateString('es-ES'); v.usuario=USER;
+  cfg.vacantes.push(v); return v;
+}
+
+// ---------- Elegir vacante (alta nueva / asignar formacion) ----------
+function mpElegirVacante(titulo, texto, despPref, puestoPref, onOk){
+  var abiertas=mpVacantes().filter(function(v){ return v.estado==='ABIERTA'; });
+  if(!abiertas.length) return false;
+  abiertas.sort(function(a,b){
+    function sc(v){ return (v.despacho===despPref?0:2)+(mpNorm(v.puesto)===mpNorm(puestoPref)||mpDep(v.puesto)===mpDep(puestoPref)?0:1); }
+    return sc(a)-sc(b) || String(a.despacho).localeCompare(String(b.despacho));
+  });
+  window._MP_ELEG=abiertas; window._MP_ELEG_OK=onOk;
+  var h='<h3>'+escH(titulo)+'</h3><p style="font-size:.78rem;color:var(--mu);margin:.3rem 0 .6rem">'+escH(texto)+'</p><div style="max-height:46vh;overflow-y:auto;border:1px solid var(--b);border-radius:6px">';
+  abiertas.forEach(function(v,i){
+    var c=v.candidato?MAPA_ST.INC:(mpVacPrior(v)?MAPA_ST.VAC:['#fce4d6','#843c0c']);
+    h+='<label style="display:flex;gap:.5rem;align-items:flex-start;padding:.4rem .6rem;border-bottom:1px solid var(--b);cursor:pointer;background:'+c[0]+';color:'+c[1]+'"><input type="radio" name="MPEL" value="'+i+'"'+(i===0&&v.despacho===despPref?' checked':'')+'><span><b>'+escH(v.despacho)+'</b> · '+escH(v.puesto)+(v.candidato?' · candidato: '+escH(v.candidato):'')+(v.nota?'<br><span style="font-size:.7rem">'+escH(v.nota)+'</span>':'')+'</span></label>';
+  });
+  h+='<label style="display:flex;gap:.5rem;padding:.45rem .6rem;cursor:pointer"><input type="radio" name="MPEL" value="-1"'+(abiertas[0].despacho!==despPref?' checked':'')+'><span>No cubre ninguna vacante</span></label></div>';
+  h+='<div class="ma" style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.7rem"><button class="btn btn-r" id="MPEL-OK" onclick="mpElegidaOk()">Aceptar</button></div>';
+  mpModal('MPEL',h,520);
+  return true;
+}
+function mpElegidaOk(){
+  var r=document.querySelector('input[name=MPEL]:checked'), i=r?parseInt(r.value,10):-1;
+  closeModal('MPEL');
+  if(i>=0 && window._MP_ELEG_OK) window._MP_ELEG_OK(window._MP_ELEG[i]);
+}
+function mpCerrarCon(vac, emp){
+  var cfg=mpCfg();
+  cfg.vacantes=cfg.vacantes.map(function(v){
+    if(v.id!==vac.id) return v;
+    var n=JSON.parse(JSON.stringify(v));
+    n.estado='CUBIERTA'; n.dni_cubierta=emp.dni; n.cubierta_por=mpF(emp,'nombre')||emp.nombre; n.fecha_cierre=new Date().toLocaleDateString('es-ES');
+    return n;
+  });
+}
+function mpTrasAlta(emp){
+  var nom=mpF(emp,'nombre')||emp.nombre;
+  mpElegirVacante('¿Cubre alguna vacante?', nom+' se ha dado de alta en '+(mpF(emp,'despacho')||'(sin despacho)')+'. Si ocupa una vacante del mapa, elígela y quedará cerrada.', mpF(emp,'despacho'), mpF(emp,'puesto'), function(v){
+    mpCerrarCon(v, emp);
+    var es2=ges(emp.dni); if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+    if(v.despacho && v.despacho!==mpF(emp,'despacho')){
+      if(confirm('La vacante es de '+v.despacho+' y la ficha tiene '+(mpF(emp,'despacho')||'otro despacho')+'.\n\n¿Cambiar su despacho a '+v.despacho+'?')){
+        es2.historial.push({id:Date.now()+'',fecha:new Date().toLocaleDateString('es-ES'),campo:'Despacho',anterior:mpF(emp,'despacho'),nuevo:v.despacho,usuario:USER});
+        es2.edits.despacho=v.despacho;
+      }
+    }
+    saveAll(); renderList();
+    if(document.getElementById('MAPA')) openMapa(); else if(cDni===emp.dni) renderDetail(emp);
+    showSaved('Vacante cerrada ✓');
+  });
+}
+function mpAsignarFormacion(i){
+  var p=window._MP_FORM[i]; if(!p) return;
+  var hay=mpElegirVacante('Asignar a una vacante', p.nombre+' pasará al despacho de la vacante, deja de estar "en formación" y la vacante queda cerrada.', '', p.puesto, function(v){
+    var e=p.e, es2=ges(e.dni), hoy=new Date().toLocaleDateString('es-ES');
+    if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+    if(v.despacho!==mpF(e,'despacho')){ es2.historial.push({id:Date.now()+'',fecha:hoy,campo:'Despacho',anterior:mpF(e,'despacho'),nuevo:v.despacho,usuario:USER}); es2.edits.despacho=v.despacho; }
+    es2.historial.push({id:(Date.now()+1)+'',fecha:hoy,campo:'Situación (mapa)',anterior:'EN FORMACIÓN',nuevo:'ACTIVO',usuario:USER});
+    delete es2.edits.sit_mapa;
+    mpCerrarCon(v, e);
+    saveAll(); renderList(); openMapa(); showSaved('Asignada ✓');
+  });
+  if(!hay) alert('No hay vacantes abiertas.');
+}
+function mpTrasBaja(emp, motivo){
+  var nom=mpF(emp,'nombre')||emp.nombre, d=mpF(emp,'despacho'), p=mpF(emp,'puesto');
+  if(!d) return;
+  var ya=mpVacantes().some(function(v){ return v.estado==='ABIERTA' && v.sustituye===nom; });
+  if(ya) return;
+  if(!confirm(nom+' ('+p+', '+d+') '+motivo+'.\n\n¿Crear una vacante en el mapa para cubrir su puesto?\n\nAceptar: se crea como PRIORITARIA (puedes cambiarlo en el mapa).\nCancelar: no se crea vacante.')) return;
+  mpCrearVacante({despacho:d, puesto:String(p).toUpperCase(), nota:(/larga/.test(motivo)?'Cubrir baja larga de ':'Sustituir a ')+nom, sustituye:nom});
+  saveAll(); showSaved('Vacante creada ✓');
+}
+
+// ---------- Campos del mapa en la ficha ----------
+function mpCaja(emp,es2){
+  var s=document.createElement('div'); s.className='sbox'; s.id='MP-BOX';
+  var inc=mpIncluida(emp), sit=mpSit(emp), m=getField(emp,es2,'mapa_incluir');
+  var hdr='<div class="shead" style="display:flex;justify-content:space-between;align-items:center"><div class="stitle"><span class="sicon">&#128506;</span> Mapa de despachos</div><button class="btn btn-o btn-xs" onclick="mpEditarCampos()">✎ Editar</button></div>';
+  function ic(l,v){ return '<div class="ic"><div class="l">'+escH(l)+'</div><div class="v">'+escH(v||'-')+'</div></div>'; }
+  s.innerHTML=hdr+'<div class="cg">'+ic('Sale en el mapa',(inc?'Sí':'No')+(m?' (marcado a mano)':' (automático)'))+ic('Situación',sit.t||'Activo')+ic('Cubre a',getField(emp,es2,'cubre_a'))+ic('Nota en el mapa',getField(emp,es2,'nota_mapa'))+'</div>';
+  return s;
+}
+function mpEditarCampos(){
+  var emp=getEmp(cDni); if(!emp) return; var es2=ges(emp.dni), g=function(f){ return getField(emp,es2,f)||''; };
+  var h='<h3>Mapa de despachos · '+escH(mpF(emp,'nombre'))+'</h3>';
+  h+='<div class="fg"><label>Situación</label><select id="MPF-sit"><option value="">Automática (activo, o IT si tiene baja médica registrada)</option>';
+  MAPA_SITS.forEach(function(x){ h+='<option'+(g('sit_mapa')===x?' selected':'')+'>'+x+'</option>'; });
+  h+='</select></div>';
+  h+='<div class="fg"><label>Cubre a (si es provisional o sustituye a alguien)</label><input id="MPF-cub" value="'+escH(g('cubre_a'))+'"></div>';
+  h+='<div class="fg"><label>Nota en el mapa</label><input id="MPF-nota" value="'+escH(g('nota_mapa'))+'" placeholder="Ej.: se quiere sustituir, media jornada..."></div>';
+  h+='<div class="fg"><label>¿Sale en el mapa?</label><select id="MPF-inc"><option value="">Automático (no salen bajas ni Educar salvo Marketing)</option><option'+(g('mapa_incluir')==='SÍ'?' selected':'')+' value="SÍ">Sí, siempre</option><option'+(g('mapa_incluir')==='NO'?' selected':'')+' value="NO">No</option></select></div>';
+  h+='<div class="ma" style="display:flex;gap:.5rem;justify-content:flex-end"><button class="btn btn-o" onclick="closeModal(\'MPF\')">Cancelar</button><button class="btn btn-r" id="MPF-save" onclick="mpGuardarCampos()">Guardar</button></div>';
+  mpModal('MPF',h,480);
+}
+function mpGuardarCampos(){
+  var emp=getEmp(cDni); if(!emp) return; var es2=ges(emp.dni); if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+  var campos=[['sit_mapa','MPF-sit','Situación (mapa)'],['cubre_a','MPF-cub','Cubre a'],['nota_mapa','MPF-nota','Nota en el mapa'],['mapa_incluir','MPF-inc','Sale en el mapa']];
+  var hoy=new Date().toLocaleDateString('es-ES'), t=Date.now(), antesSit=getField(emp,es2,'sit_mapa')||'', cambio=false;
+  campos.forEach(function(c,i){
+    var nv=String(document.getElementById(c[1]).value||'').trim(), ov=getField(emp,es2,c[0])||'';
+    if(nv===ov) return; cambio=true;
+    if(nv==='') delete es2.edits[c[0]]; else es2.edits[c[0]]=nv;
+    es2.historial.push({id:(t+i)+'',fecha:hoy,campo:c[2],anterior:ov,nuevo:nv,usuario:USER});
+  });
+  closeModal('MPF');
+  if(!cambio) return;
+  var nuevaSit=getField(emp,es2,'sit_mapa')||'';
+  if(nuevaSit==='BAJA MÉDICA LARGA' && antesSit!=='BAJA MÉDICA LARGA') mpTrasBaja(emp,'pasa a baja médica larga');
+  saveAll(); renderDetail(emp); renderList();
+}
+
+// ---------- Exportar ----------
+function mpExportar(){
+  if(typeof XLSX==='undefined'){
+    var sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js';
+    sc.onload=mpExportar; document.head.appendChild(sc); return;
+  }
+  var M=mpCalcular(), wb=XLSX.utils.book_new();
+  var pend=[['Estado','Prioridad','Despacho','Puesto','Candidato / persona','Incorporación','Nota']];
+  M.vac.forEach(function(v){ pend.push([v.candidato?'CANDIDATO CONFIRMADO':'SIN CUBRIR', v.prioridad||'PRIORITARIA', v.despacho, v.puesto, v.candidato||'', v.fecha_inc?fd(v.fecha_inc):(v.candidato?'Por definir':''), v.nota||'']); });
+  M.personas.filter(function(p){ return p.sit.k==='INC'; }).forEach(function(p){ pend.push(['INCORPORACIÓN (ficha creada)','',p.despacho,p.puesto,p.nombre,fd(p.inicio),p.sit.extra]); });
+  var pl=[['Despacho','Nombre','Puesto','Departamento','Situación','Cubre a / nota','F. incorporación']];
+  M.personas.slice().sort(function(a,b){ return String(a.despacho).localeCompare(String(b.despacho)) || mpDepIdx(a.puesto)-mpDepIdx(b.puesto) || String(a.nombre).localeCompare(String(b.nombre)); })
+    .forEach(function(p){ pl.push([p.despacho,p.nombre,p.puesto,mpDep(p.puesto)[0],p.sit.t||'ACTIVO',p.sit.extra,fd(p.inicio)]); });
+  var fo=[['Nombre','Puesto','Despacho','Desde']]; M.form.forEach(function(p){ fo.push([p.nombre,p.puesto,p.despacho,fd(p.inicio)]); });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pend),'Puestos a cubrir');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(pl),'Plantilla por despacho');
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(fo),'En formacion');
+  XLSX.writeFile(wb,'Mapa_despachos_'+new Date().toLocaleDateString('es-ES').replace(/\//g,'-')+'.xlsx');
+}
+
+// ---------- Carga inicial (datos del Excel del 20/10/2026) ----------
+var MP_SEED_SIT=[
+  ['MARTINEZ RELANO ENRIQUE','BAJA MÉDICA CORTA','',''],
+  ['PROKOPETS RADZIVIL DARYNA','BAJA MÉDICA LARGA','',''],
+  ['BRITOS CANETE ANA BELEN','BAJA MÉDICA LARGA','',''],
+  ['VELASCO DEL PINO FRANCISCO JOSE','BAJA MÉDICA CORTA','',''],
+  ['RAMON ORTEGA CERDAN','PROVISIONAL','Enrique Martínez Relaño',''],
+  ['MOTA MARTINEZ GLORIA','TELETRABAJO TEMPORAL','',''],
+  ['FRANCO MARTINEZ DIANET ALEJANDRA','EN FORMACIÓN','',''],
+  ['HERNANDEZ RODRIGUEZ SHIRLEY VANESSA','EN FORMACIÓN','',''],
+  ['ACCEVEDO LONDONO SUSANA','EN FORMACIÓN','',''],
+  ['ARES VILA ADRIANA','','','Se quiere sustituir'],
+  ['HORCASITAS MEDINA SARA MARIA','','','Se quiere sustituir']
+];
+var MP_SEED_VAC=[
+  {despacho:'MU 65',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:'Jurídico · media jornada',candidato:'PENDIENTE DE NOMBRE',fecha_inc:'2026-11-10'},
+  {despacho:'MU 126',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:'Jurídico · media jornada · cubre a Gloria Mota · noviembre, día por definir',candidato:'NURIA',fecha_inc:''},
+  {despacho:'VALLECAS 76',puesto:'ABOGADO/A',prioridad:'NO PRIORITARIA',nota:'Sustituir a Adriana Ares'},
+  {despacho:'MU 35',puesto:'ADMINISTRATIVO/A',prioridad:'NO PRIORITARIA',nota:'Sustituir a Sara Horcasitas'},
+  {despacho:'VALLECAS 108',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:'Jurídico'},
+  {despacho:'OPORTO',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:''},
+  {despacho:'VISTA ALEGRE',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:'Jurídico'},
+  {despacho:'VISTA ALEGRE',puesto:'ADMINISTRATIVO/A',prioridad:'PRIORITARIA',nota:''},
+  {despacho:'VISTA ALEGRE',puesto:'COMERCIAL',prioridad:'PRIORITARIA',nota:'Cubrir con una comercial en formación'},
+  {despacho:'PUEBLO NUEVO',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:'Jurídico'},
+  {despacho:'PUEBLO NUEVO',puesto:'ABOGADO/A',prioridad:'PRIORITARIA',nota:'Extranjería',candidato:'MÉNDEZ ORDÓÑEZ, NATALIA',fecha_inc:''},
+  {despacho:'PUEBLO NUEVO',puesto:'ASESOR/A ADMINISTRATIVO/A',prioridad:'PRIORITARIA',nota:'',candidato:'ANA MARGARITA',fecha_inc:'2026-10-26'},
+  {despacho:'PUEBLO NUEVO',puesto:'COMERCIAL',prioridad:'PRIORITARIA',nota:'Cubrir con una comercial en formación'}
+];
+var MP_SEED_DESP_ADD=['VISTA ALEGRE','PUEBLO NUEVO'], MP_SEED_DESP_DEL=['MU 108','MU 119'];
+function mpBuscarFicha(nombreSeed){
+  var tk=mpNorm(nombreSeed).split(' '), mejor=null;
+  EMPS_BASE.forEach(function(e){
+    if(getEstado(e)==='BAJA') return;
+    var n=' '+mpNorm(mpF(e,'nombre')||e.nombre)+' ';
+    if(tk.every(function(t){ return n.indexOf(' '+t+' ')>=0; })) mejor=mejor||e;
+  });
+  return mejor;
+}
+function mpPlanInicial(){
+  var plan={sit:[],noenc:[],desAdd:[],desDel:[],desNoDel:[]};
+  MP_SEED_SIT.forEach(function(s){ var e=mpBuscarFicha(s[0]); if(e) plan.sit.push({e:e,s:s}); else plan.noenc.push(s[0]); });
+  MP_SEED_DESP_ADD.forEach(function(d){ if(DESPS.indexOf(d)<0) plan.desAdd.push(d); });
+  MP_SEED_DESP_DEL.forEach(function(d){
+    if(DESPS.indexOf(d)<0) return;
+    var gente=EMPS_BASE.filter(function(e){ return getEstado(e)!=='BAJA' && mpF(e,'despacho')===d; }).length;
+    if(gente) plan.desNoDel.push(d+' ('+gente+' personas activas)'); else plan.desDel.push(d);
+  });
+  return plan;
+}
+function mpCargaInicial(){
+  var pl=mpPlanInicial();
+  var h='<h3>Cargar datos iniciales del mapa</h3><p style="font-size:.77rem;color:var(--mu);margin:.3rem 0 .6rem">Esto se hace una sola vez. Revisa lo que se va a aplicar:</p>';
+  h+='<div style="font-size:.76rem;line-height:1.5"><b>Situaciones en fichas ('+pl.sit.length+')</b><ul style="margin:.2rem 0 .5rem 1.1rem">';
+  pl.sit.forEach(function(x){ h+='<li>'+escH(mpF(x.e,'nombre')||x.e.nombre)+' → '+escH([x.s[1],x.s[2]?'cubre a '+x.s[2]:'',x.s[3]].filter(function(y){return y;}).join(' · '))+'</li>'; });
+  h+='</ul>';
+  if(pl.noenc.length) h+='<div style="color:var(--dg);margin-bottom:.5rem">&#9888; No encontradas en el portal (no se tocan): '+escH(pl.noenc.join('; '))+'</div>';
+  h+='<b>Vacantes y candidatos ('+MP_SEED_VAC.length+')</b><ul style="margin:.2rem 0 .5rem 1.1rem">';
+  MP_SEED_VAC.forEach(function(v){ h+='<li>'+escH(v.despacho)+' · '+escH(v.puesto)+' · '+(v.candidato?'candidato: '+escH(v.candidato):escH(v.prioridad))+(v.nota?' · '+escH(v.nota):'')+'</li>'; });
+  h+='</ul>';
+  if(pl.desAdd.length) h+='<div>Despachos que se añaden: <b>'+escH(pl.desAdd.join(', '))+'</b></div>';
+  if(pl.desDel.length) h+='<div>Despachos que se eliminan de la lista: <b>'+escH(pl.desDel.join(', '))+'</b></div>';
+  if(pl.desNoDel.length) h+='<div style="color:var(--dg)">&#9888; No se eliminan porque tienen personal: '+escH(pl.desNoDel.join('; '))+'</div>';
+  h+='</div><div class="ma" style="display:flex;gap:.5rem;justify-content:flex-end;margin-top:.8rem"><button class="btn btn-o" onclick="closeModal(\'MPI\')">Cancelar</button><button class="btn btn-r" id="MPI-OK" onclick="mpAplicarInicial()">Aplicar</button></div>';
+  mpModal('MPI',h,600);
+}
+function mpAplicarInicial(){
+  var pl=mpPlanInicial(), cfg=mpCfg(), hoy=new Date().toLocaleDateString('es-ES'), t=Date.now();
+  pl.sit.forEach(function(x,i){
+    var es2=ges(x.e.dni); if(!es2.edits) es2.edits={}; if(!es2.historial) es2.historial=[];
+    [['sit_mapa',x.s[1],'Situación (mapa)'],['cubre_a',x.s[2],'Cubre a'],['nota_mapa',x.s[3],'Nota en el mapa']].forEach(function(c,j){
+      if(!c[1]) return; var ov=es2.edits[c[0]]||''; if(ov===c[1]) return;
+      es2.edits[c[0]]=c[1]; es2.historial.push({id:(t+i*10+j)+'',fecha:hoy,campo:c[2],anterior:ov,nuevo:c[1],usuario:USER});
+    });
+  });
+  MP_SEED_VAC.forEach(function(v){ mpCrearVacante(JSON.parse(JSON.stringify(v))); });
+  pl.desAdd.forEach(function(d){ if(DESPS.indexOf(d)<0) DESPS.push(d); });
+  pl.desDel.forEach(function(d){ var k=DESPS.indexOf(d); if(k>=0) DESPS.splice(k,1); });
+  DESPS.sort();
+  cfg.edits.mapa_inicial=hoy;
+  var mmpi=document.getElementById('MPI'); if(mmpi) mmpi.classList.remove('open');
+  saveDespachos(); // guarda tambien todo lo anterior
+  renderList(); openMapa(); showSaved('Datos del mapa cargados ✓');
+}
+
+// ---------- Despachos borrados: que no vuelvan a aparecer ----------
+function mpBorrados(){ var e=ST['_config']&&ST['_config'].edits; return (e&&Array.isArray(e.despachos_borrados))?e.despachos_borrados.slice():[]; }
+var _mpLoadDespachos=loadDespachos;
+loadDespachos=function(){
+  _mpLoadDespachos();
+  var b=mpBorrados();
+  for(var i=DESPS.length-1;i>=0;i--) if(b.indexOf(DESPS[i])>=0) DESPS.splice(i,1);
+};
+saveDespachos=function(){
+  var cfg=mpCfg(), antes=(cfg.edits.despachos||[]).concat(DESPS_DEFECTO), b=mpBorrados();
+  antes.forEach(function(d){ if(DESPS.indexOf(d)<0 && b.indexOf(d)<0) b.push(d); });
+  b=b.filter(function(d){ return DESPS.indexOf(d)<0; });
+  cfg.edits.despachos=DESPS.slice();
+  cfg.edits.despachos_borrados=b;
+  saveAll();
+};
+
+// ---------- Enganches con el resto del portal ----------
+var _mpBuildDatos=buildDatos;
+buildDatos=function(emp,es2,c){ _mpBuildDatos(emp,es2,c); try{ c.appendChild(mpCaja(emp,es2)); }catch(x){ console.error(x); } };
+var _mpSaveNewEmp=saveNewEmp;
+saveNewEmp=function(){
+  var n=EXTRA_EMPS.length;
+  _mpSaveNewEmp.apply(this,arguments);
+  if(EXTRA_EMPS.length>n){ var emp=EXTRA_EMPS[EXTRA_EMPS.length-1]; try{ mpTrasAlta(getEmp(emp.dni)||emp); }catch(x){ console.error(x); } }
+};
+var _mpSaveEdit=saveEdit;
+saveEdit=function(){
+  var ef=editField, emp=ef&&ef.emp, antesEst=emp?getEstado(emp):'';
+  _mpSaveEdit.apply(this,arguments);
+  try{
+    if(!emp) return; var e2=getEmp(emp.dni)||emp;
+    if((ef.field==='baja'||ef.field==='estado') && antesEst!=='BAJA' && getEstado(e2)==='BAJA') mpTrasBaja(e2,'causa baja');
+  }catch(x){ console.error(x); }
+};
+
+// ---------- Informe Excel con formato (mismo diseño que el Excel de trabajo) ----------
+function mpFilasDe(personas, vacs){
+  var gente=personas.filter(function(p){ return p.sit.k!=='INC'; });
+  gente.sort(function(a,b){ var x=mpDepIdx(a.puesto)-mpDepIdx(b.puesto); if(x) return x; x=String(a.puesto).localeCompare(String(b.puesto)); if(x) return x; return String(a.nombre).localeCompare(String(b.nombre)); });
+  var inc=personas.filter(function(p){ return p.sit.k==='INC'; });
+  var cand=vacs.filter(function(v){ return v.candidato; });
+  var vs=vacs.filter(function(v){ return !v.candidato; }).sort(function(a,b){ return (mpVacPrior(a)?0:1)-(mpVacPrior(b)?0:1); });
+  var rows=[];
+  gente.concat(inc).forEach(function(p){ rows.push({nombre:p.nombre, puesto:p.puesto, despacho:p.despacho, txt:[p.sit.t,p.sit.extra].filter(function(x){return x;}).join(' · '), k:p.sit.k}); });
+  cand.forEach(function(v){ rows.push({nombre:v.candidato, puesto:v.puesto, despacho:v.despacho, txt:'CANDIDATO · incorpora '+(v.fecha_inc?fd(v.fecha_inc):'(fecha pte)')+(v.nota?' · '+v.nota:''), k:'INC'}); });
+  vs.forEach(function(v){ rows.push({nombre:'VACANTE', puesto:v.puesto, despacho:v.despacho, txt:'VACANTE · '+(mpVacPrior(v)?'prioritaria':'no prioritaria')+(v.nota?' · '+v.nota:''), k:'VAC'}); });
+  var pri=vs.filter(mpVacPrior).length;
+  var nAus=gente.filter(function(p){ return p.sit.k==='AUS'; }).length, nForm=gente.filter(function(p){ return p.sit.s==='EN FORMACIÓN'; }).length;
+  var stats='Plantilla: '+gente.length+(nAus?'   ·   Ausentes: '+nAus:'')+(nForm?'   ·   En formación: '+nForm:'')+'   ·   Incorporaciones: '+(inc.length+cand.length)+'   ·   Vacantes: '+vs.length+(vs.length?' ('+pri+' prioritarias)':'');
+  return {rows:rows, pri:pri, stats:stats};
+}
+function mpInforme(){
+  if(typeof ExcelJS==='undefined'){
+    var sc=document.createElement('script'); sc.src='https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js';
+    sc.onload=mpInforme; sc.onerror=function(){ alert('No se pudo cargar el generador de Excel. Revisa la conexión e inténtalo de nuevo.'); };
+    document.head.appendChild(sc); showSaved('Preparando informe...'); return;
+  }
+  var M=mpCalcular(), P=M.personas, V=M.vac;
+  var A=function(h){ return 'FF'+h.replace('#','').toUpperCase(); };
+  var NAVY='#1F3864', ROJO='#C00000';
+  var fnt=function(o){ o=o||{}; return {name:'Arial', size:o.size||10, bold:!!o.bold, italic:!!o.italic, color:{argb:A(o.color||'#000000')}}; };
+  var fil=function(c){ return {type:'pattern', pattern:'solid', fgColor:{argb:A(c)}}; };
+  var hair={style:'hair', color:{argb:A('#D9D9D9')}};
+  var hoy=new Date().toLocaleDateString('es-ES');
+  var wb=new ExcelJS.Workbook(); wb.creator='Portal RRHH';
+
+  // ===== Hoja 1: Mapa despachos =====
+  var ws=wb.addWorksheet('Mapa despachos',{views:[{showGridLines:false}],properties:{tabColor:{argb:A(NAVY)}},
+    pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  var W=[32,24,38,2,32,24,38,2,32,24,38,2]; W.forEach(function(w,i){ ws.getColumn(i+1).width=w; });
+  function put(r,c,v,o){ var x=ws.getCell(r,c); x.value=v; o=o||{}; x.font=fnt(o); if(o.fill) x.fill=fil(o.fill); x.alignment={vertical:'middle',horizontal:o.h||'left',wrapText:!!o.wrap,indent:o.ind||0}; if(o.border) x.border=o.border; return x; }
+  function band(ws_,r,c1,c2,v,bg,fg,size){ ws_.mergeCells(r,c1,r,c2); for(var c=c1;c<=c2;c++) ws_.getCell(r,c).fill=fil(bg); var x=ws_.getCell(r,c1); x.value=v; x.font=fnt({bold:true,size:size||12,color:fg}); x.alignment={vertical:'middle',indent:1}; ws_.getRow(r).height=22; }
+  put(1,1,'MAPA DE PLANTILLA POR DESPACHO',{bold:true,size:18,color:NAVY});
+  put(2,1,'Informe generado desde el Portal RRHH el '+hoy+' a las '+new Date().toLocaleTimeString('es-ES',{hour:'2-digit',minute:'2-digit'})+'. Fichas activas (sin Educar salvo Marketing) + vacantes.',{italic:true,size:9,color:'#595959'});
+  // KPIs
+  var gente=P.filter(function(p){ return p.sit.k!=='INC'; }), vSin=V.filter(function(v){ return !v.candidato; });
+  var vPri=vSin.filter(mpVacPrior).length, incPers=P.filter(function(p){ return p.sit.k==='INC'; }), incVac=V.filter(function(v){ return v.candidato; });
+  var kpis=[[1,'PLANTILLA',gente.length,NAVY,'#FFFFFF'],[2,'VACANTES SIN CUBRIR',vSin.length,ROJO,'#FFFFFF'],[3,'PRIORITARIAS / NO PRIORITARIAS',vPri+'  /  '+(vSin.length-vPri),'#FFC7CE','#9C0006'],
+    [5,'INCORPORACIONES PENDIENTES',incPers.length+incVac.length,'#C6EFCE','#006100'],[6,'EN FORMACIÓN',M.form.length,'#DDEBF7','#1F4E79'],[7,'DE BAJA / AUSENTES',gente.filter(function(p){return p.sit.k==='AUS';}).length,'#EDEDED','#595959']];
+  kpis.forEach(function(k){
+    put(4,k[0],k[1],{bold:true,size:9,color:k[4],fill:k[3],h:'center',wrap:true});
+    ws.mergeCells(5,k[0],6,k[0]); put(5,k[0],k[2],{bold:true,size:24,color:k[4],fill:k[3],h:'center'}); ws.getCell(6,k[0]).fill=fil(k[3]);
+  });
+  ws.getRow(4).height=26; ws.getRow(5).height=22; ws.getRow(6).height=22;
+  // Puestos a cubrir
+  var P0=8;
+  band(ws,P0,1,7,'PUESTOS A CUBRIR  (vacantes y candidatos confirmados)',ROJO,'#FFFFFF');
+  var bot2={bottom:{style:'medium',color:{argb:A(ROJO)}}};
+  [[1,'Estado'],[2,'Despacho'],[3,'Puesto'],[5,'Persona'],[6,'F. incorporación'],[7,'Nota']].forEach(function(h){ put(P0+1,h[0],h[1],{bold:true,size:9,color:'#595959',border:bot2}); });
+  ws.getCell(P0+1,4).border=bot2;
+  var filas=[];
+  vSin.filter(mpVacPrior).forEach(function(v){ filas.push(['PRIORITARIA · sin candidato',v.despacho,v.puesto,'—','—',v.nota||'','#FFC7CE','#9C0006',true]); });
+  vSin.filter(function(v){ return !mpVacPrior(v); }).forEach(function(v){ filas.push(['NO PRIORITARIA · sin candidato',v.despacho,v.puesto,'—','—',v.nota||'','#FCE4D6','#843C0C',false]); });
+  var cub=[];
+  incVac.forEach(function(v){ cub.push(['CUBIERTA · candidato confirmado',v.despacho,v.puesto,v.candidato,v.fecha_inc?fd(v.fecha_inc):'Por definir',v.nota||'','#C6EFCE','#006100',false]); });
+  incPers.forEach(function(p){ cub.push(['CUBIERTA · ficha creada',p.despacho,p.puesto,p.nombre,fd(p.inicio),p.sit.extra,'#C6EFCE','#006100',false]); });
+  var ordD=function(a,b){ return String(a[1]).localeCompare(String(b[1])); };
+  filas=filas.filter(function(f){return f[8];}).sort(ordD).concat(filas.filter(function(f){return !f[8];}).sort(ordD)).concat(cub.sort(ordD));
+  if(!filas.length) put(P0+2,1,'No hay vacantes abiertas.',{italic:true,color:'#808080'});
+  filas.forEach(function(f,i){
+    var r=P0+2+i;
+    [[1,f[0]],[2,f[1]],[3,f[2]],[4,''],[5,f[3]],[6,f[4]],[7,f[5]]].forEach(function(c){ put(r,c[0],c[1],{size:9,color:f[7],fill:f[6],bold:c[0]===1,wrap:c[0]===7,h:c[0]===6?'center':'left',border:{bottom:hair}}); });
+  });
+  // En formación
+  band(ws,P0,9,11,'EN FORMACIÓN  ('+M.form.length+')  ·  disponibles para cubrir vacantes','#1F4E79','#FFFFFF');
+  var bot3={bottom:{style:'medium',color:{argb:A('#1F4E79')}}};
+  [[9,'Nombre'],[10,'Puesto'],[11,'Desde · despacho actual']].forEach(function(h){ put(P0+1,h[0],h[1],{bold:true,size:9,color:'#595959',border:bot3}); });
+  if(!M.form.length) put(P0+2,9,'Nadie en formación',{italic:true,size:9,color:'#808080'});
+  M.form.forEach(function(p,i){ var r=P0+2+i;
+    put(r,9,p.nombre,{bold:true,size:9,color:'#1F4E79',fill:'#DDEBF7'}); put(r,10,p.puesto,{size:9,color:'#1F4E79',fill:'#DDEBF7'}); put(r,11,fd(p.inicio)+' · '+p.despacho,{size:9,color:'#1F4E79',fill:'#DDEBF7'}); });
+  var r0=P0+2+Math.max(filas.length,M.form.length,1)+2;
+  // Leyenda
+  function leyenda(ws_,row,cols){
+    var it=[['Vacante','#FFC7CE','#9C0006'],['Incorporación / candidato','#C6EFCE','#006100'],['Provisional','#FFEB9C','#9C5700'],['Baja / ausente','#EDEDED','#595959'],['Formación / teletrabajo','#DDEBF7','#1F4E79'],['Cabecera roja = vacante prioritaria',ROJO,'#FFFFFF']];
+    var c1=ws_.getCell(row,1); c1.value='Leyenda'; c1.font=fnt({bold:true,size:9});
+    it.forEach(function(x,i){ var c=ws_.getCell(row,cols[i]); c.value=x[0]; c.fill=fil(x[1]); c.font=fnt({bold:true,size:9,color:x[2]}); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; });
+    var c2=ws_.getCell(row+1,1); c2.value='Puesto'; c2.font=fnt({bold:true,size:9});
+    MAPA_DEPS.filter(function(d){ return d[0]!=='FORMACIÓN'; }).forEach(function(d,i){ var c=ws_.getCell(row+1,cols[i]); c.value=d[0]; c.fill=fil(d[1]); c.font=fnt({bold:true,size:9,color:d[2]}); c.alignment={horizontal:'center',vertical:'middle',wrapText:true}; });
+    ws_.getRow(row).height=30; ws_.getRow(row+1).height=30;
+  }
+  leyenda(ws,r0,[2,3,5,6,7,9]);
+  band(ws,r0+3,1,11,'MAPA POR DESPACHO',NAVY,'#FFFFFF');
+  // Fichas
+  function fichas(ws_,grupos,cols,widths,perRow,start){
+    var span=cols.length, r=start;
+    for(var g0=0; g0<grupos.length; g0+=perRow){
+      var chunk=grupos.slice(g0,g0+perRow), alto=0;
+      chunk.forEach(function(g,k){
+        var c0=1+k*(span+1), d=g.datos;
+        ws_.mergeCells(r,c0,r,c0+span-1);
+        for(var j=0;j<span;j++) ws_.getCell(r,c0+j).fill=fil(d.pri?ROJO:NAVY);
+        var t=ws_.getCell(r,c0); t.value=g.titulo; t.font=fnt({bold:true,size:12,color:'#FFFFFF'}); t.alignment={vertical:'middle',indent:1};
+        ws_.mergeCells(r+1,c0,r+1,c0+span-1);
+        for(j=0;j<span;j++) ws_.getCell(r+1,c0+j).fill=fil('#D9E1F2');
+        var s=ws_.getCell(r+1,c0); s.value=d.stats; s.font=fnt({bold:true,size:9,color:NAVY}); s.alignment={vertical:'middle',indent:1};
+        cols.forEach(function(cn,j){ var h=ws_.getCell(r+2,c0+j); h.value=cn[0]; h.font=fnt({bold:true,size:9,color:'#595959'}); h.border={bottom:{style:'medium',color:{argb:A(NAVY)}}}; });
+        d.rows.forEach(function(row,i){
+          var st=row.k?MAPA_ST[row.k]:null, dep=mpDep(row.puesto);
+          cols.forEach(function(cn,j){
+            var x=ws_.getCell(r+3+i,c0+j); x.value=row[cn[1]]||''; x.border={bottom:hair}; x.alignment={vertical:'top',wrapText:cn[1]==='txt'};
+            if(st){ x.fill=fil(st[0]); x.font=fnt({size:9,color:st[1],bold:row.k==='VAC'||(cn[1]==='puesto'),italic:row.k==='AUS'}); }
+            else if(cn[1]==='puesto'){ x.fill=fil(dep[1]); x.font=fnt({size:9,bold:true,color:dep[2]}); }
+            else x.font=fnt({size:9});
+          });
+        });
+        if(!d.rows.length){ var e=ws_.getCell(r+3,c0); e.value='(sin personal)'; e.font=fnt({italic:true,size:9,color:'#A6A6A6'}); }
+        alto=Math.max(alto,3+Math.max(d.rows.length,1));
+      });
+      r+=alto+2;
+    }
+    for(var k=0;k<perRow;k++){ widths.forEach(function(w,j){ ws_.getColumn(1+k*(span+1)+j).width=w; }); ws_.getColumn(1+k*(span+1)+span).width=2; }
+  }
+  var porDesp={};
+  P.forEach(function(p){ (porDesp[p.despacho]=porDesp[p.despacho]||{p:[],v:[]}).p.push(p); });
+  V.forEach(function(v){ var d=v.despacho||'SIN DESPACHO'; (porDesp[d]=porDesp[d]||{p:[],v:[]}).v.push(v); });
+  var orden=DESPS.filter(function(d){ return porDesp[d]; }); Object.keys(porDesp).forEach(function(d){ if(orden.indexOf(d)<0) orden.push(d); });
+  fichas(ws, orden.map(function(d){ return {titulo:d, datos:mpFilasDe(porDesp[d].p, porDesp[d].v)}; }), [['Nombre','nombre'],['Puesto','puesto'],['Situación / nota','txt']], [32,24,38], 3, r0+5);
+
+  // ===== Hoja 2: Por departamento =====
+  var wd=wb.addWorksheet('Por departamento',{views:[{showGridLines:false}],pageSetup:{orientation:'landscape',fitToPage:true,fitToWidth:1,fitToHeight:0,paperSize:9}});
+  var c=wd.getCell(1,1); c.value='PLANTILLA POR DEPARTAMENTO'; c.font=fnt({bold:true,size:16,color:NAVY});
+  c=wd.getCell(2,1); c.value='Generado el '+hoy+' desde el Portal RRHH.'; c.font=fnt({italic:true,size:9,color:'#595959'});
+  leyenda(wd,4,[2,3,4,6,7,8]);
+  var porDep={};
+  P.forEach(function(p){ var d=mpDep(p.puesto)[0]; (porDep[d]=porDep[d]||{p:[],v:[]}).p.push(p); });
+  V.forEach(function(v){ var d=mpDep(v.puesto)[0]; (porDep[d]=porDep[d]||{p:[],v:[]}).v.push(v); });
+  var gd=MAPA_DEPS.map(function(d){ return d[0]; }).filter(function(d){ return porDep[d]; }).map(function(d){
+    var x=mpFilasDe(porDep[d].p, porDep[d].v);
+    x.rows.sort(function(a,b){ return String(a.despacho).localeCompare(String(b.despacho)); });
+    var ord={'':0,PROV:0,OTR:0,AUS:0,INC:1,VAC:2}; x.rows.sort(function(a,b){ return (ord[a.k||'']-ord[b.k||'']) || String(a.despacho).localeCompare(String(b.despacho)) || String(a.nombre).localeCompare(String(b.nombre)); });
+    return {titulo:d, datos:x}; });
+  fichas(wd, gd, [['Nombre','nombre'],['Despacho','despacho'],['Puesto','puesto'],['Situación / nota','txt']], [30,15,24,36], 2, 7);
+
+  // ===== Hoja 3: Datos (listado plano para filtrar) =====
+  var wl=wb.addWorksheet('Datos',{views:[{state:'frozen',ySplit:1}]});
+  var cab=['Despacho','Nombre','Puesto','Departamento','Sociedad','Situación','Cubre a / nota','F. incorporación','Tipo'];
+  wl.addRow(cab);
+  wl.getRow(1).eachCell(function(x){ x.font=fnt({bold:true,color:'#FFFFFF'}); x.fill=fil(NAVY); x.alignment={vertical:'middle'}; });
+  P.slice().sort(function(a,b){ return String(a.despacho).localeCompare(String(b.despacho)) || mpDepIdx(a.puesto)-mpDepIdx(b.puesto) || String(a.nombre).localeCompare(String(b.nombre)); }).forEach(function(p){
+    wl.addRow([p.despacho,p.nombre,p.puesto,mpDep(p.puesto)[0],sA(mpF(p.e,'sociedad')),p.sit.t||'ACTIVO',p.sit.extra,fd(p.inicio),p.sit.k==='INC'?'Incorporación':'Plantilla']); });
+  V.forEach(function(v){ wl.addRow([v.despacho,v.candidato||'VACANTE',v.puesto,mpDep(v.puesto)[0],'',v.candidato?'CANDIDATO CONFIRMADO':'VACANTE · '+(v.prioridad||'PRIORITARIA'),v.nota||'',v.fecha_inc?fd(v.fecha_inc):'',v.candidato?'Candidato':'Vacante']); });
+  [16,36,28,24,14,30,40,14,14].forEach(function(w,i){ wl.getColumn(i+1).width=w; });
+  wl.eachRow(function(row,n){ if(n>1) row.eachCell(function(x){ x.font=fnt({size:9}); }); });
+  wl.autoFilter={from:{row:1,column:1},to:{row:1,column:cab.length}};
+
+  wb.xlsx.writeBuffer().then(function(buf){
+    var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='Mapa_Plantilla_Despachos_'+hoy.replace(/\//g,'-')+'.xlsx';
+    document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1000);
+    showSaved('Informe descargado ✓');
+  }).catch(function(e){ console.error(e); alert('No se pudo generar el informe: '+e.message); });
+}
+mpExportar=mpInforme;
+
 </script>
 </body>
 </html>
